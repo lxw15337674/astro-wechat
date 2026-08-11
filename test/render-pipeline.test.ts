@@ -17,9 +17,13 @@ afterEach(() => {
   project.cleanup()
 })
 
-async function render(body: string, frontmatter: Record<string, unknown> = {}) {
+async function render(
+  body: string,
+  frontmatter: Record<string, unknown> = {},
+  config: Record<string, unknown> = {},
+) {
   const path = writePost(project, { body, frontmatter })
-  const resolved = await project.resolved({ siteUrl: 'https://example.com' })
+  const resolved = await project.resolved({ siteUrl: 'https://example.com', ...config })
   return prepareArticle(path, resolved)
 }
 
@@ -28,6 +32,15 @@ describe('渲染流水线', () => {
     const rendered = await render('段落。\n')
     expect(rendered.html).not.toContain('<style')
     expect(rendered.html).toMatch(/<p[^>]*style="/)
+  })
+
+  it('支持 doocs-default 主题，并将主题变量预先解析为微信可用的值', async () => {
+    const rendered = await render('# 一级标题\n\n## 二级标题\n\n`行内代码`\n', {}, { theme: 'doocs-default' })
+
+    expect(rendered.html).toContain('border-bottom:2px solid #0f4c81')
+    expect(rendered.html).toContain('background:#0f4c81')
+    expect(rendered.html).toContain('rgba(15, 76, 129, 0.08)')
+    expect(rendered.html).not.toContain('var(--')
   })
 
   it('净化掉脚本与事件处理属性', async () => {

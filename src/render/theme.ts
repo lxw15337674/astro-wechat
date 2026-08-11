@@ -1,5 +1,6 @@
 import { RenderError } from '../errors.js'
 import { DEFAULT_THEME_CSS } from './themes/default.js'
+import { DOOCS_DEFAULT_THEME_CSS } from './themes/doocs-default.js'
 
 export interface Theme {
   readonly name: string
@@ -10,6 +11,7 @@ export interface Theme {
 
 const THEMES = new Map<string, Theme>([
   ['default', { name: 'default', css: DEFAULT_THEME_CSS, referenceHeading: '参考链接' }],
+  ['doocs-default', { name: 'doocs-default', css: DOOCS_DEFAULT_THEME_CSS, referenceHeading: '参考链接' }],
 ])
 
 export function getTheme(name: string): Theme {
