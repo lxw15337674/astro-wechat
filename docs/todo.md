@@ -32,6 +32,7 @@ pnpm run typecheck && pnpm test && pnpm run build
 | --- | --- | --- |
 | 确认公众号「素材管理」「草稿箱」接口权限已开通 | 要登录公众平台后台 | 未认证个人订阅号调不通，整个包无法工作 |
 | 确认 npm scope `@bhwa233` 可由当前账户发布 | 公共 registry 当前对该包返回 404，但 scope 权限仍取决于 npm 账户 | 决定最终包名 |
+| 为父仓库配置 Git remote 并推送 `feat/milestone-1-to-5` | 当前仓库没有任何 remote | 无法触发 Node 22 与代理 CI |
 | 代理机器的 HTTPS 域名与证书 | 你的机器 | 代理必须是 HTTPS，凭据会经过这条链路 |
 | 用真实文章跑 `preview` 看排版 | 只有你知道好不好看 | 主题 CSS 大概率要调一轮 |
 | 定哪些 AstroPaper 定时任务加 `wechat.enabled: true` | 内容策略 | — |
@@ -56,7 +57,7 @@ pnpm run typecheck && pnpm test && pnpm run build
 
 仍待核实：
 
-- 首次 CI 运行确认锁文件实际选择了原生预编译包。
+- 配置父仓库 remote 并首次运行 CI，确认锁文件实际选择了原生预编译包。
 - 首次公开预发布前再检索一次新出现的库形态微信排版方案。
 
 ## 5. 转发代理
