@@ -83,9 +83,18 @@ astro-wechat list                    # 列出所有文章及同步资格
 astro-wechat publish <文件...>       # 同步到草稿箱
 astro-wechat publish-changed         # 同步 Git 变更的文章
 astro-wechat cleanup-orphans         # 列出孤儿封面素材，加 --yes 才删除
+astro-wechat verify-proxy            # 验证已部署代理的 401 / 403 / 原样透传
 ```
 
 `publish` 和 `publish-changed` 支持 `--dry-run`：完整走到创建决策，报告会跳过还是会新建，但不写入。所有命令支持 `--json`。
+
+代理部署后可在不使用真实微信凭据的情况下自检：
+
+```bash
+WECHAT_PROXY_URL=https://proxy.example.com \
+WECHAT_PROXY_TOKEN=独立代理令牌 \
+astro-wechat verify-proxy
+```
 
 ### 环境变量
 

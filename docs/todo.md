@@ -10,7 +10,7 @@
 pnpm run typecheck && pnpm test && pnpm run build
 ```
 
-结果：类型检查通过，135 项测试全部通过，声明与 JavaScript 构建成功。`yt_dlp_fastapi` 已添加为 `services/yt-dlp-fastapi` submodule，废弃的 `docs/gateway-contract.md` 已删除，工作分支为 `feat/milestone-1-to-5`。
+结果：类型检查通过，当前 138 项测试全部通过，声明与 JavaScript 构建成功。`yt_dlp_fastapi` 已添加为 `services/yt-dlp-fastapi` submodule，废弃的 `docs/gateway-contract.md` 已删除，工作分支为 `feat/milestone-1-to-5`。
 
 ### 后续回归时优先看这几处
 
@@ -68,7 +68,7 @@ pnpm run typecheck && pnpm test && pnpm run build
 
 - 在代理主机配置 `WECHAT_PROXY_TOKEN`（与 `API_AUTH_TOKEN` 分开）
 - 把该主机 IP 填入公众平台白名单
-- 跑一遍[部署自检](proxy-contract.md#7-部署自检)：401 / 403 / 原样透传三条 curl
+- 运行 `astro-wechat verify-proxy` 完成[部署自检](proxy-contract.md#7-部署自检)：401 / 403 / 原样透传；命令使用伪微信凭据
 - 确认前置反向代理与 APM 不记录完整 URL —— 这两处不在本仓库和 submodule 的控制范围内
 - submodule 改动已提交为 `78a7c39` 并推送到远端分支 `feat/wechat-forwarding-proxy`；合并该分支后再将父仓库指针更新到上游主分支提交
 

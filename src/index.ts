@@ -89,3 +89,10 @@ export { PATHS, classifyErrorCode } from './wechat/codes.js'
 export type { WechatErrorKind } from './wechat/codes.js'
 export { WechatTransport, assertNoWechatError } from './wechat/transport.js'
 export type { TransportOptions, WechatEnvelope, WechatRequest } from './wechat/transport.js'
+export { verifyProxy } from './wechat/proxy-verify.js'
+export type {
+  ProxyCheckName,
+  ProxyCheckResult,
+  ProxyVerificationResult,
+  VerifyProxyOptions,
+} from './wechat/proxy-verify.js'

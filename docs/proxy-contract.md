@@ -80,7 +80,15 @@ Authorization: Bearer <WECHAT_PROXY_TOKEN>
 
 ## 7. 部署自检
 
-部署后从本地验证，**不要用生产账户**：
+部署后优先运行自动自检；它使用固定伪凭据，不会接触生产 AppSecret：
+
+```bash
+WECHAT_PROXY_URL=https://你的代理 \
+WECHAT_PROXY_TOKEN=你的独立代理令牌 \
+astro-wechat verify-proxy
+```
+
+命令会验证无认证返回 401、群发路径返回 403，以及伪凭据触发的微信错误仍以 HTTP 200 和 `errcode` 原样返回。需要逐项诊断时可使用等价 curl：
 
 ```bash
 # 应当返回 401

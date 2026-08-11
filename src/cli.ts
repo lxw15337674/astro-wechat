@@ -15,6 +15,7 @@ import { writePreview } from './preview/index.js'
 import { JsonLedgerStore } from './state/store.js'
 import { cleanupOrphans, listOrphans } from './sync/cleanup.js'
 import { WeChatClient } from './wechat/client.js'
+import { verifyProxy } from './wechat/proxy-verify.js'
 import type { ArticleResult, ProjectConfig, ResolvedProject } from './types.js'
 
 const cli = cac('astro-wechat')
@@ -299,6 +300,33 @@ addCommonOptions(cli.command('cleanup-orphans', '删除台账中记录的孤儿�
     }
 
     if (result.failed.length > 0) process.exitCode = 1
+  })
+
+cli
+  .command('verify-proxy', '验证已部署转发代理的认证、白名单与原样透传')
+  .option('--json', '输出机器可读 JSON')
+  .option('--timeout <ms>', '每个自检请求的超时毫秒数', { default: '15000' })
+  .action(async (options: { json?: boolean; timeout?: string }) => {
+    const proxyUrl = process.env.WECHAT_PROXY_URL?.trim() ?? ''
+    const proxyToken = process.env.WECHAT_PROXY_TOKEN?.trim() ?? ''
+    const timeoutMs = Number.parseInt(options.timeout ?? '15000', 10)
+    const result = await verifyProxy({
+      proxyUrl,
+      proxyToken,
+      timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 15_000,
+    })
+
+    if (options.json) {
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+    } else {
+      for (const check of result.checks) {
+        process.stdout.write(
+          `${check.passed ? '+' : '!'} ${check.name}: ${check.actual}（预期 ${check.expected}）\n`,
+        )
+      }
+    }
+
+    if (!result.passed) process.exitCode = 1
   })
 
 cli.help()

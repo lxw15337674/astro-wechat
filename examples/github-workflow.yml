@@ -9,7 +9,7 @@ on:
   workflow_call:
     inputs:
       article-paths:
-        description: 要同步的文章路径，空格分隔。留空则同步 HEAD~1..HEAD 的变更
+        description: 要同步的文章路径 JSON 数组，例如 ["src/data/blog/a.md"]；留空则同步 HEAD~1..HEAD 的变更
         required: false
         type: string
     secrets:
@@ -55,13 +55,34 @@ jobs:
       # 这篇会被跳过还是会新建。
       - name: Dry run
         env:
+          ARTICLE_PATHS_JSON: ${{ inputs.article-paths }}
           WECHAT_APP_ID: ${{ secrets.WECHAT_APP_ID }}
           WECHAT_APP_SECRET: ${{ secrets.WECHAT_APP_SECRET }}
           WECHAT_PROXY_URL: ${{ secrets.WECHAT_PROXY_URL }}
           WECHAT_PROXY_TOKEN: ${{ secrets.WECHAT_PROXY_TOKEN }}
         run: |
-          if [ -n "${{ inputs.article-paths }}" ]; then
-            astro-wechat publish ${{ inputs.article-paths }} --dry-run --json
+          if [ -n "$ARTICLE_PATHS_JSON" ]; then
+            paths_file="$RUNNER_TEMP/astro-wechat-article-paths"
+            node - "$paths_file" <<'NODE'
+          const fs = require('node:fs')
+          const output = process.argv[2]
+          let paths
+          try {
+            paths = JSON.parse(process.env.ARTICLE_PATHS_JSON)
+          } catch {
+            console.error('article-paths 不是合法 JSON')
+            process.exit(2)
+          }
+          if (!Array.isArray(paths) || paths.length === 0 || paths.some(
+            (path) => typeof path !== 'string' || path.length === 0 || /[\0\r\n]/.test(path),
+          )) {
+            console.error('article-paths 必须是不含换行的非空字符串组成的 JSON 数组')
+            process.exit(2)
+          }
+          fs.writeFileSync(output, `${paths.join('\n')}\n`, { mode: 0o600 })
+          NODE
+            mapfile -t article_paths < "$paths_file"
+            astro-wechat publish --dry-run --json -- "${article_paths[@]}"
           else
             astro-wechat publish-changed --dry-run --json
           fi
@@ -69,13 +90,34 @@ jobs:
       - name: Publish
         id: publish
         env:
+          ARTICLE_PATHS_JSON: ${{ inputs.article-paths }}
           WECHAT_APP_ID: ${{ secrets.WECHAT_APP_ID }}
           WECHAT_APP_SECRET: ${{ secrets.WECHAT_APP_SECRET }}
           WECHAT_PROXY_URL: ${{ secrets.WECHAT_PROXY_URL }}
           WECHAT_PROXY_TOKEN: ${{ secrets.WECHAT_PROXY_TOKEN }}
         run: |
-          if [ -n "${{ inputs.article-paths }}" ]; then
-            astro-wechat publish ${{ inputs.article-paths }} --json | tee results.json
+          if [ -n "$ARTICLE_PATHS_JSON" ]; then
+            paths_file="$RUNNER_TEMP/astro-wechat-article-paths"
+            node - "$paths_file" <<'NODE'
+          const fs = require('node:fs')
+          const output = process.argv[2]
+          let paths
+          try {
+            paths = JSON.parse(process.env.ARTICLE_PATHS_JSON)
+          } catch {
+            console.error('article-paths 不是合法 JSON')
+            process.exit(2)
+          }
+          if (!Array.isArray(paths) || paths.length === 0 || paths.some(
+            (path) => typeof path !== 'string' || path.length === 0 || /[\0\r\n]/.test(path),
+          )) {
+            console.error('article-paths 必须是不含换行的非空字符串组成的 JSON 数组')
+            process.exit(2)
+          }
+          fs.writeFileSync(output, `${paths.join('\n')}\n`, { mode: 0o600 })
+          NODE
+            mapfile -t article_paths < "$paths_file"
+            astro-wechat publish --json -- "${article_paths[@]}" | tee results.json
           else
             astro-wechat publish-changed --json | tee results.json
           fi
@@ -86,7 +128,7 @@ jobs:
       - name: Commit ledger
         if: always()
         run: |
-          if git diff --quiet -- .astro-wechat/ledger.json; then
+          if [ -z "$(git status --porcelain -- .astro-wechat/ledger.json)" ]; then
             echo "台账无变化"
             exit 0
           fi

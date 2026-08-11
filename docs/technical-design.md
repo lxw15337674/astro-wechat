@@ -354,6 +354,7 @@ Astro 集成应导出 schema 片段或辅助函数，使 Astro 项目内容 sche
 | `publish` | 是 | 同步一篇或多篇显式 Markdown 文件 |
 | `publish-changed` | 是 | 同步两个 Git 修订间变更的符合条件文件 |
 | `cleanup-orphans` | 是 | 仅在 opt-in 时删除已记录的孤儿封面素材 |
+| `verify-proxy` | 否 | 使用伪微信凭据验证已部署代理的认证、白名单与原样透传 |
 
 两个 publish 命令均须支持 `--dry-run`：它执行到创建决策为止，包括草稿身份查找、资源解析、渲染和哈希，随后报告计划操作，不上传或写入。`inspect` 和 `preview` 无法替代它，因为二者不查询草稿身份，也就无法回答「这篇会被跳过还是会新建」。
 
