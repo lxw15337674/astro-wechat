@@ -12,6 +12,8 @@ pnpm run typecheck && pnpm test && pnpm run build
 
 结果：类型检查通过，当前 138 项测试全部通过，声明与 JavaScript 构建成功。`yt_dlp_fastapi` 已添加为 `services/yt-dlp-fastapi` submodule，废弃的 `docs/gateway-contract.md` 已删除，工作分支为 `feat/milestone-1-to-5`。
 
+npm 包名已确定为 `@lxw15337674/astro-wechat`。本机 `npm whoami` 返回 `lxw15337674`，`npm access list packages lxw15337674` 显示该个人 scope 下已有包具备 `read-write` 权限；新包当前尚未发布。
+
 ### 后续回归时优先看这几处
 
 写完后做过一轮逐文件推演，预修了 6 处类型问题。若仍有报错，最可能在：
@@ -31,7 +33,6 @@ pnpm run typecheck && pnpm test && pnpm run build
 | 事项 | 为什么 | 不做的后果 |
 | --- | --- | --- |
 | 确认公众号「素材管理」「草稿箱」接口权限已开通 | 要登录公众平台后台 | 未认证个人订阅号调不通，整个包无法工作 |
-| 登录 npm 并确认当前账户可发布 `@lxw15337674/astro-wechat` | 包名已确定，但本机 npm 尚未登录 | 无法完成首次公开发布 |
 | 为父仓库配置 Git remote 并推送 `feat/milestone-1-to-5` | 当前仓库没有任何 remote | 无法触发 Node 22 与代理 CI |
 | 代理机器的 HTTPS 域名与证书 | 你的机器 | 代理必须是 HTTPS，凭据会经过这条链路 |
 | 用真实文章跑 `preview` 看排版 | 只有你知道好不好看 | 主题 CSS 大概率要调一轮 |

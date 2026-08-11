@@ -20,7 +20,7 @@
 
 ## 计划中的包
 
-- npm 包：`@lxw15337674/astro-wechat`（公共 registry 当前未发布，仍需登录 npm 核验发布权限）
+- npm 包：`@lxw15337674/astro-wechat`（scope 所有权已核验，公共 registry 当前未发布）
 - CLI 命令：`astro-wechat`
 - 运行时：Node.js 22+、ESM、TypeScript
 - 初始 Astro 目标版本：当前稳定大版本，并在发布前评估其前一个大版本

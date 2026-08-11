@@ -23,7 +23,7 @@
 
 Astro 集成绝不会在 `astro dev`、`astro sync` 或 `astro build` 期间自动发布。
 
-包名确定为 `@lxw15337674/astro-wechat`；发布前仍需登录 npm 核验账户权限。
+包名确定为 `@lxw15337674/astro-wechat`；已通过 npm 登录身份和现有包的 `read-write` 权限核验个人 scope 所有权。
 
 ## 后果
 
