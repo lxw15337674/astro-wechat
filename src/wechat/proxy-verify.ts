@@ -1,7 +1,7 @@
-import { PROXY_PATH_PREFIX } from './codes.js'
+import { PROXY_V2_PATH, WECHAT_API_ORIGIN } from './codes.js'
 import { ProxyError } from './errors.js'
 
-export type ProxyCheckName = 'missing-auth' | 'path-allowlist' | 'wechat-passthrough'
+export type ProxyCheckName = 'missing-auth' | 'target-policy' | 'wechat-passthrough'
 
 export interface ProxyCheckResult {
   readonly name: ProxyCheckName
@@ -48,16 +48,16 @@ export async function verifyProxy(options: VerifyProxyOptions): Promise<ProxyVer
     await statusCheck(
       'missing-auth',
       'HTTP 401',
-      () => request(fetchImpl, base, '/cgi-bin/stable_token', timeoutMs),
+      () => request(fetchImpl, base, `${WECHAT_API_ORIGIN}/cgi-bin/stable_token`, timeoutMs),
       401,
     ),
   )
   checks.push(
     await statusCheck(
-      'path-allowlist',
+      'target-policy',
       'HTTP 403',
       () =>
-        request(fetchImpl, base, '/cgi-bin/message/mass/send', timeoutMs, {
+        request(fetchImpl, base, 'https://example.com/proxy-policy-check', timeoutMs, {
           token,
         }),
       403,
@@ -100,14 +100,20 @@ async function passthroughCheck(
   const expected = 'HTTP 200，JSON body 含非零 errcode'
 
   try {
-    const response = await request(fetchImpl, base, '/cgi-bin/stable_token', timeoutMs, {
+    const response = await request(
+      fetchImpl,
+      base,
+      `${WECHAT_API_ORIGIN}/cgi-bin/stable_token`,
+      timeoutMs,
+      {
       token,
       json: {
         grant_type: 'client_credential',
         appid: 'astro-wechat-proxy-check',
         secret: 'not-a-real-secret',
       },
-    })
+      },
+    )
     const text = await response.text()
     let payload: unknown
     try {
@@ -147,16 +153,18 @@ interface RequestOptions {
 function request(
   fetchImpl: typeof fetch,
   base: string,
-  path: string,
+  target: string,
   timeoutMs: number,
   options: RequestOptions = {},
 ): Promise<Response> {
   const headers = new Headers()
   if (options.token) headers.set('Authorization', `Bearer ${options.token}`)
   if (options.json !== undefined) headers.set('Content-Type', 'application/json')
+  headers.set('X-Proxy-Target', target)
+  headers.set('X-Proxy-Method', options.json === undefined ? 'GET' : 'POST')
 
-  return fetchImpl(`${base}${PROXY_PATH_PREFIX}${path}`, {
-    method: options.json === undefined ? 'GET' : 'POST',
+  return fetchImpl(`${base}${PROXY_V2_PATH}`, {
+    method: 'POST',
     headers,
     body: options.json === undefined ? undefined : JSON.stringify(options.json),
     redirect: 'manual',

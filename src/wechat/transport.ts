@@ -1,5 +1,5 @@
 import {
-  PROXY_PATH_PREFIX,
+  PROXY_V2_PATH,
   RETRYABLE_HTTP_STATUS,
   WECHAT_API_ORIGIN,
   classifyErrorCode,
@@ -89,13 +89,10 @@ export class WechatTransport {
   }
 
   async #attempt<T>(request: WechatRequest): Promise<T> {
-    const url = this.#buildUrl(request)
+    const targetUrl = this.#buildTargetUrl(request)
+    const method = request.method ?? 'POST'
     const headers: Record<string, string> = {}
     let body: RequestInit['body']
-
-    if (this.#options.proxyToken) {
-      headers.Authorization = `Bearer ${this.#options.proxyToken}`
-    }
 
     if (request.json !== undefined) {
       headers['Content-Type'] = 'application/json'
@@ -106,10 +103,21 @@ export class WechatTransport {
       body = request.form()
     }
 
+    let url = targetUrl
+    if (this.usesProxy) {
+      const serialized = await serializeUpstreamBody(targetUrl, method, headers, body)
+      url = joinPath(this.#options.proxyUrl!, PROXY_V2_PATH)
+      headers.Authorization = `Bearer ${this.#options.proxyToken!}`
+      headers['X-Proxy-Target'] = targetUrl
+      headers['X-Proxy-Method'] = method
+      body = serialized.body
+      if (serialized.contentType) headers['Content-Type'] = serialized.contentType
+    }
+
     let response: Response
     try {
       response = await this.#fetch(url, {
-        method: request.method ?? 'POST',
+        method: this.usesProxy ? 'POST' : method,
         headers,
         body,
         redirect: 'manual',
@@ -119,7 +127,7 @@ export class WechatTransport {
       throw this.#networkFailure(request, cause)
     }
 
-    this.#assertProxyOk(response)
+    await this.#assertProxyOk(response, request)
 
     if (!response.ok) {
       throw new WechatApiError(`微信返回 HTTP ${response.status}。`, {
@@ -134,11 +142,8 @@ export class WechatTransport {
     return payload
   }
 
-  #buildUrl(request: WechatRequest): string {
-    const base = this.#options.proxyUrl ?? WECHAT_API_ORIGIN
-    const path = this.#options.proxyUrl ? `${PROXY_PATH_PREFIX}${request.path}` : request.path
-
-    const url = new URL(joinPath(base, path))
+  #buildTargetUrl(request: WechatRequest): string {
+    const url = new URL(joinPath(WECHAT_API_ORIGIN, request.path))
     for (const [key, value] of Object.entries(request.query ?? {})) {
       url.searchParams.set(key, value)
     }
@@ -151,15 +156,40 @@ export class WechatTransport {
    * Only meaningful when a proxy is configured; talking to WeChat directly, a
    * 401 is WeChat's own answer and must not be relabelled.
    */
-  #assertProxyOk(response: Response): void {
+  async #assertProxyOk(response: Response, request: WechatRequest): Promise<void> {
     if (!this.usesProxy) return
 
-    if (response.status === 401 || response.status === 403) {
-      throw new ProxyError(
-        `转发代理拒绝了请求（HTTP ${response.status}）：令牌无效，或路径不在白名单内。`,
-        { code: 'proxy-rejected', httpStatus: response.status },
+    const result = response.headers.get('x-proxy-result')
+    if (result === 'upstream') return
+
+    let detail = ''
+    let code = 'proxy-bad-response'
+    try {
+      const payload = JSON.parse(await response.text()) as { detail?: unknown; error_code?: unknown }
+      if (typeof payload.detail === 'string') detail = payload.detail
+      if (typeof payload.error_code === 'string') code = payload.error_code
+    } catch {
+      // The status and result marker still provide enough information below.
+    }
+    if (response.status === 401 && code === 'proxy-bad-response') code = 'proxy-auth-failed'
+
+    if (!request.idempotent && PROXY_OUTCOME_UNKNOWN_CODES.has(code)) {
+      throw new OutcomeUnknownError(
+        `代理请求失败且结果未知：${request.path}。不得重试，必须先与微信核对。`,
+        { code: 'outcome-unknown' },
       )
     }
+
+    const reason = detail
+      ? `：${detail}`
+      : result === null
+        ? '：响应未按原样透传契约标记'
+        : ''
+    throw new ProxyError(`转发代理未完成请求（HTTP ${response.status}）${reason}`, {
+      code,
+      httpStatus: response.status,
+      retryable: RETRYABLE_HTTP_STATUS.has(response.status),
+    })
   }
 
   #networkFailure(request: WechatRequest, cause: unknown): Error {
@@ -208,6 +238,35 @@ export class WechatTransport {
       }
       throw new WechatApiError('微信返回了非 JSON 响应。', { code: 'invalid-json', cause })
     }
+  }
+}
+
+const PROXY_OUTCOME_UNKNOWN_CODES = new Set([
+  'upstream_timeout',
+  'upstream_unreachable',
+  'response_too_large',
+])
+
+interface SerializedBody {
+  readonly body: ArrayBuffer | undefined
+  readonly contentType: string | undefined
+}
+
+/** Convert multipart and JSON bodies to the exact bytes consumed by `/v2/proxy`. */
+async function serializeUpstreamBody(
+  targetUrl: string,
+  method: string,
+  headers: Readonly<Record<string, string>>,
+  body: RequestInit['body'],
+): Promise<SerializedBody> {
+  if (body === undefined || body === null) {
+    return { body: undefined, contentType: headers['Content-Type'] }
+  }
+
+  const request = new Request(targetUrl, { method, headers, body })
+  return {
+    body: await request.arrayBuffer(),
+    contentType: request.headers.get('content-type') ?? undefined,
   }
 }
 

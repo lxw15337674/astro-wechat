@@ -114,7 +114,7 @@ yt-dlp>=2026.2.21,<2027.0.0
 两项与安全相关的现状：
 
 - **该服务已有通用转发端点 `/v1/proxy`，但不能复用**。理由见 ADR-0005 第 2 条，其中「不支持 multipart 请求体」是硬阻塞。
-- **uvicorn access log 会泄露 access token**。access log 记录完整请求行含 query string，而微信把 `access_token` 放在 query 里。已通过在 `uvicorn.run()` 传 `access_log=False` 解决，代理端点自行输出不含 query 的日志行。前置反向代理与 APM 仍需单独确认。
+- **日志不得采集代理控制头或 body**。`/v2/proxy` 的外层请求行只有固定路径，不含微信 query；但完整目标位于 `X-Proxy-Target`，token 请求体含 AppSecret。uvicorn 默认访问日志只记录外层请求行，前置反向代理与 APM 仍需确认不会采集完整请求头或 body。
 
 ### 待核实
 

@@ -8,10 +8,10 @@ function authorization(call: MockCall): string | null {
 }
 
 describe('代理部署自检', () => {
-  it('验证 401、路径白名单和微信 HTTP 200 错误原样透传', async () => {
+  it('验证 401、目标策略和微信 HTTP 200 错误原样透传', async () => {
     const mock = createMockFetch((call) => {
       if (authorization(call) === null) return jsonResponse({ detail: 'missing' }, 401)
-      if (call.url.pathname.endsWith('/cgi-bin/message/mass/send')) {
+      if (call.headers.get('x-proxy-target')?.startsWith('https://example.com/')) {
         return jsonResponse({ detail: 'forbidden' }, 403)
       }
       return jsonResponse({ errcode: 40013, errmsg: 'invalid appid' })
@@ -26,9 +26,14 @@ describe('代理部署自检', () => {
     expect(result).toMatchObject({ proxyOrigin: 'https://proxy.example.com', passed: true })
     expect(result.checks).toHaveLength(3)
     expect(mock.calls.map((call) => call.url.pathname)).toEqual([
-      '/wechat/cgi-bin/stable_token',
-      '/wechat/cgi-bin/message/mass/send',
-      '/wechat/cgi-bin/stable_token',
+      '/v2/proxy',
+      '/v2/proxy',
+      '/v2/proxy',
+    ])
+    expect(mock.calls.map((call) => call.headers.get('x-proxy-method'))).toEqual([
+      'GET',
+      'GET',
+      'POST',
     ])
     expect(authorization(mock.calls[0]!)).toBeNull()
     expect(authorization(mock.calls[1]!)).toBe('Bearer proxy-secret')
@@ -37,7 +42,9 @@ describe('代理部署自检', () => {
   it('HTTP 状态被代理改写时报告失败', async () => {
     const mock = createMockFetch((call) => {
       if (authorization(call) === null) return jsonResponse({}, 401)
-      if (call.url.pathname.endsWith('/message/mass/send')) return jsonResponse({}, 403)
+      if (call.headers.get('x-proxy-target')?.startsWith('https://example.com/')) {
+        return jsonResponse({}, 403)
+      }
       return jsonResponse({ errcode: 40013 }, 400)
     })
 

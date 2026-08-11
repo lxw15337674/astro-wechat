@@ -53,7 +53,7 @@ npm 包名已确定为 `@lxw15337674/astro-wechat`。本机 `npm whoami` 返回 
 
 已核实：
 
-- 外部代理服务已有 `httpx` 依赖，转发端点不引入新包；服务已有的通用 `/v1/proxy` 不能复用（不支持 multipart 二进制体，且目标不受限、令牌共用）。
+- 外部代理服务已有 `httpx` 依赖；新增通用 `/v2/proxy` 流式透传 multipart/二进制体，并以部署策略限制目标、方法和体积。`/v1/proxy` 保持兼容。
 - `doocs/md` 使用 WTFPL，内部有 `@md/core` workspace，但未向公共 npm registry 发布；继续使用独立默认主题。
 - `@resvg/resvg-js` 与 `sharp` 已在开发机和 GitHub Actions Node 22/Linux x64 glibc 环境实际加载。
 
@@ -63,15 +63,15 @@ npm 包名已确定为 `@lxw15337674/astro-wechat`。本机 `npm whoami` 返回 
 
 ## 5. 转发代理
 
-外部代理服务的实现已完成并推送到其独立仓库分支 `feat/wechat-forwarding-proxy`。父项目只配置服务地址和令牌，不检出、构建或测试代理源码。
+外部代理服务的 `/v2/proxy` 实现位于其独立仓库分支 `feat/proxy-v2-streaming`。父项目只配置服务地址和令牌，不检出、构建或测试代理源码。
 
 剩下的是部署与验证：
 
-- 在代理主机配置 `WECHAT_PROXY_TOKEN`（与 `API_AUTH_TOKEN` 分开）
+- 在代理主机配置 `PROXY_V2_ALLOWED_HOSTS=api.weixin.qq.com` 等目标策略；调用方的 `WECHAT_PROXY_TOKEN` 使用服务端 `API_AUTH_TOKEN` 的值
 - 把该主机 IP 填入公众平台白名单
 - 运行 `astro-wechat verify-proxy` 完成[部署自检](proxy-contract.md#7-部署自检)：401 / 403 / 原样透传；命令使用伪微信凭据
-- 确认前置反向代理与 APM 不记录完整 URL —— 这两处不在本仓库的控制范围内
-- 将外部代理仓库的 `feat/wechat-forwarding-proxy` 分支部署到固定 IP 主机；父仓库无需记录服务源码版本
+- 确认前置反向代理与 APM 不采集完整 `X-Proxy-Target` 或请求体 —— 这两处不在本仓库的控制范围内
+- 将外部代理仓库的 `feat/proxy-v2-streaming` 分支部署到固定 IP 主机；父仓库无需记录服务源码版本
 
 设计阶段的 `services/wechat-proxy-reference/` 已删除，避免保留一份会漂移的安全敏感代码副本。
 

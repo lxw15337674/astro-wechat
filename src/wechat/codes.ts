@@ -9,9 +9,7 @@
  */
 
 export const WECHAT_API_ORIGIN = 'https://api.weixin.qq.com'
-
-/** Path prefix the forwarding proxy strips before calling WeChat. */
-export const PROXY_PATH_PREFIX = '/wechat'
+export const PROXY_V2_PATH = '/v2/proxy'
 
 export const PATHS = {
   stableToken: '/cgi-bin/stable_token',

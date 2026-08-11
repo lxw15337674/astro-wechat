@@ -83,7 +83,7 @@ astro-wechat list                    # 列出所有文章及同步资格
 astro-wechat publish <文件...>       # 同步到草稿箱
 astro-wechat publish-changed         # 同步 Git 变更的文章
 astro-wechat cleanup-orphans         # 列出孤儿封面素材，加 --yes 才删除
-astro-wechat verify-proxy            # 验证已部署代理的 401 / 403 / 原样透传
+astro-wechat verify-proxy            # 验证已部署代理的认证 / 目标策略 / 原样透传
 ```
 
 `publish` 和 `publish-changed` 支持 `--dry-run`：完整走到创建决策，报告会跳过还是会新建，但不写入。所有命令支持 `--json`。
@@ -92,7 +92,7 @@ astro-wechat verify-proxy            # 验证已部署代理的 401 / 403 / 原�
 
 ```bash
 WECHAT_PROXY_URL=https://proxy.example.com \
-WECHAT_PROXY_TOKEN=独立代理令牌 \
+WECHAT_PROXY_TOKEN=服务端API_AUTH_TOKEN \
 astro-wechat verify-proxy
 ```
 
@@ -136,6 +136,8 @@ Astro 仓库 (CI, 托管 runner)              固定 IP 主机
 ```
 
 **代理只做转发**，不解析响应、不认识 `errcode`、不持有凭据。微信协议实现全部在 Node，因此只有一套契约测试。代价是微信凭据存在于 CI —— 取舍见 ADR-0005。
+
+调用使用通用 `POST /v2/proxy` 协议，部署策略只放行 `api.weixin.qq.com`、HTTPS 443 和 GET/POST；服务端没有微信专用路由。
 
 未配置代理地址时客户端直连微信，用于已列入白名单的机器上本地调试。
 

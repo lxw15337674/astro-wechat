@@ -303,7 +303,7 @@ addCommonOptions(cli.command('cleanup-orphans', '删除台账中记录的孤儿�
   })
 
 cli
-  .command('verify-proxy', '验证已部署转发代理的认证、白名单与原样透传')
+  .command('verify-proxy', '验证已部署转发代理的认证、目标策略与原样透传')
   .option('--json', '输出机器可读 JSON')
   .option('--timeout <ms>', '每个自检请求的超时毫秒数', { default: '15000' })
   .action(async (options: { json?: boolean; timeout?: string }) => {
