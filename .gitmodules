@@ -1,3 +1,0 @@
-[submodule "services/yt-dlp-fastapi"]
-	path = services/yt-dlp-fastapi
-	url = https://github.com/lxw15337674/yt_dlp_fastapi.git

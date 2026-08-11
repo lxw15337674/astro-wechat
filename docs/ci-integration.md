@@ -109,13 +109,13 @@ CI 需要四个环境密钥：
 
 **已决定：由固定 IP 机器上的转发代理充当微信请求的出口。** 该机器的 IP 填入公众平台白名单；微信协议实现留在 Node，代理只做转发；CI 仍使用 GitHub 托管 runner。完整取舍见 ADR-0005。
 
-代理寄生在该机器上已运行的 `yt_dlp_fastapi` 服务中，并以 git submodule 形式引入本仓库的 `services/yt-dlp-fastapi`。
+代理独立部署在固定 IP 机器上。父项目只依赖它的 HTTPS 地址与契约，不依赖其源码、仓库位置或实现语言。
 
 对 CI 的直接影响：
 
 - 同步 job 跑在普通托管 runner 上，没有自托管 runner 需要维护。
 - CI 持有微信凭据与代理令牌四个值。
-- 检出时需 `submodules: true`；若代理仓库为私有，还需具备读权限的 token。生成和构建 job 不需要 submodule，可关闭以节省时间。
+- checkout、安装和构建只处理本 npm 项目；代理部署通过 `astro-wechat verify-proxy` 单独验证。
 
 两条必须清楚的风险：
 

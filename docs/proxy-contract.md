@@ -4,7 +4,7 @@
 
 代理**不理解微信**。它不解析响应体、不认识 `errcode`、不持有微信凭据。所有微信协议知识都在 Node 侧，这正是相对 ADR-0004 的取舍所在。
 
-实现位于 submodule `services/yt-dlp-fastapi`。
+代理是独立部署的外部服务。本仓库只定义调用契约，并通过 `WECHAT_PROXY_URL` 指向部署地址。
 
 ## 1. 转发规则
 
@@ -107,7 +107,7 @@ curl -i -H "Authorization: Bearer $WECHAT_PROXY_TOKEN" \
 
 第三条**必须是 HTTP 200 且 body 里有 `errcode`**。这说明代理原样透传，没有替调用方「处理」错误 —— 一旦它把 errcode 翻译成 HTTP 状态码，Node 侧的错误分类就全错了。
 
-日志方面还要确认两处，它们不在本仓库和 submodule 的控制范围内：
+日志方面还要确认两处，它们不在本仓库的控制范围内：
 
 - 前置的 Nginx / Caddy 是否记录完整 URL
 - APM 或错误上报 SDK 是否采集 URL 与请求体
@@ -118,4 +118,4 @@ curl -i -H "Authorization: Bearer $WECHAT_PROXY_TOKEN" \
 
 代理不理解微信，因此增加微信接口调用通常**不需要改代理代码**，只需要在路径白名单里加一行配置。
 
-需要改代理实现的情况只有：转发语义变化、限制值调整、认证方式变化。这类改动要同时更新本文与 submodule 指针。
+需要改代理实现的情况只有：转发语义变化、限制值调整、认证方式变化。这类改动要同时发布代理服务的新版本并更新本文，但不需要改 npm 项目的源码依赖。

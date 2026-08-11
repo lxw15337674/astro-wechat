@@ -52,9 +52,6 @@ src/
   preview/            本地独立 HTML 预览
 test/
   helpers/            临时 Astro 项目与假 fetch
-services/
-  yt-dlp-fastapi/     转发代理（git submodule，不属于 npm 包）
-                      app/wechat_proxy.py 是 /wechat/* 转发端点
 examples/
   github-workflow.yml      CI job 示例
 ```

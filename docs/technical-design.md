@@ -78,7 +78,7 @@ CLI 必须能在干净的 Node.js 进程中工作。它应直接解析本地 Mar
 | Astro 集成 | `astro-wechat/integration` | Astro 集成工厂 |
 | CLI 二进制程序 | `astro-wechat` bin | inspect、preview 与 publish 命令 |
 
-转发代理以 git submodule 形式位于 `services/yt-dlp-fastapi`，不属于 npm 包内容，Node 代码也不得 import 它。它是部署产物的来源，不是构建依赖。见 ADR-0005。
+转发代理是独立部署的外部服务，不属于本仓库或 npm 包。Node 代码只通过配置的 HTTPS 地址调用它，不依赖其源码、仓库位置或实现语言。见 ADR-0005。
 
 默认导出必须是与框架无关的核心库，而非 Astro 集成。集成位于独立子路径，因此普通 Node.js 或 CI 使用方永不加载依赖 Astro 的代码。Astro 只是通过该子路径可达的可选 peer dependency。
 
@@ -588,5 +588,4 @@ Node 侧：
    其中一项单独点名：草稿列表接口在 `no_content: 1` 时是否仍返回
    `content_source_url`。它是协调路径匹配草稿的唯一依据，猜错会让匹配永远失败。
    代码里已有判别逻辑，字段缺失时立刻报错而不是继续扫描，但正确的参数取值仍需实测确认。
-6. ADR-0003「待核实」一节的五项依赖核查，其中主题 CSS 的来源不阻塞任何代码。
-7. 转发代理的部署形态：与 `yt_dlp_fastapi` 现有接口同进程，还是同仓库不同 router 前缀下的独立部署。
+6. 首次公开预发布前完成 ADR-0003 剩余的微信排版库生态检索。

@@ -14,7 +14,7 @@
 | 微信客户端：token、图片、封面、草稿、查找 | 已实现 |
 | 草稿身份台账、两阶段写入、结果不明协调 | 已实现 |
 | CLI：inspect / preview / list / publish / publish-changed / cleanup-orphans | 已实现 |
-| 转发代理 | 已接入 `services/yt-dlp-fastapi` submodule，待部署验证 |
+| 转发代理 | 支持通过服务地址接入，待部署验证 |
 | 真实账户端到端验证 | 未做 |
 | npm 发布 | 未做 |
 
@@ -139,15 +139,8 @@ Astro 仓库 (CI, 托管 runner)              固定 IP 主机
 
 未配置代理地址时客户端直连微信，用于已列入白名单的机器上本地调试。
 
-代理以 git submodule 位于 `services/yt-dlp-fastapi`，不属于 npm 包内容，Node 代码也不 import 它。
-
-克隆时需要 submodule：
-
-```bash
-git clone --recurse-submodules <repo>
-# 已克隆过则：
-git submodule update --init --recursive
-```
+代理是独立部署的外部服务，不属于本仓库或 npm 包。调用方只需配置
+`WECHAT_PROXY_URL` 与 `WECHAT_PROXY_TOKEN`；克隆、构建和测试本项目都不需要代理源码。
 
 ## 初始范围
 

@@ -10,7 +10,9 @@
 pnpm run typecheck && pnpm test && pnpm run build
 ```
 
-结果：类型检查通过，当前 138 项测试全部通过，声明与 JavaScript 构建成功。`yt_dlp_fastapi` 已添加为 `services/yt-dlp-fastapi` submodule，废弃的 `docs/gateway-contract.md` 已删除，工作分支为 `feat/milestone-1-to-5`。
+结果：类型检查通过，当前 138 项测试全部通过，声明与 JavaScript 构建成功。代理按外部服务地址接入，不属于本仓库依赖；废弃的 `docs/gateway-contract.md` 已删除，工作分支为 `feat/milestone-1-to-5`。
+
+公开父仓库已创建并推送。GitHub Actions 的 Node 22/`ubuntu-latest` job 已实际加载 `sharp` 与 `@resvg/resvg-js`，并通过类型检查、138 项测试和构建。
 
 npm 包名已确定为 `@lxw15337674/astro-wechat`。本机 `npm whoami` 返回 `lxw15337674`，`npm access list packages lxw15337674` 显示该个人 scope 下已有包具备 `read-write` 权限；新包当前尚未发布。
 
@@ -33,7 +35,6 @@ npm 包名已确定为 `@lxw15337674/astro-wechat`。本机 `npm whoami` 返回 
 | 事项 | 为什么 | 不做的后果 |
 | --- | --- | --- |
 | 确认公众号「素材管理」「草稿箱」接口权限已开通 | 要登录公众平台后台 | 未认证个人订阅号调不通，整个包无法工作 |
-| 为父仓库配置 Git remote 并推送 `feat/milestone-1-to-5` | 当前仓库没有任何 remote | 无法触发 Node 22 与代理 CI |
 | 代理机器的 HTTPS 域名与证书 | 你的机器 | 代理必须是 HTTPS，凭据会经过这条链路 |
 | 用真实文章跑 `preview` 看排版 | 只有你知道好不好看 | 主题 CSS 大概率要调一轮 |
 | 定哪些 AstroPaper 定时任务加 `wechat.enabled: true` | 内容策略 | — |
@@ -52,26 +53,25 @@ npm 包名已确定为 `@lxw15337674/astro-wechat`。本机 `npm whoami` 返回 
 
 已核实：
 
-- `httpx` 已是 submodule 的既有依赖，转发端点不引入新包；服务已有的通用 `/v1/proxy` 不能复用（不支持 multipart 二进制体，且目标不受限、令牌共用）。
+- 外部代理服务已有 `httpx` 依赖，转发端点不引入新包；服务已有的通用 `/v1/proxy` 不能复用（不支持 multipart 二进制体，且目标不受限、令牌共用）。
 - `doocs/md` 使用 WTFPL，内部有 `@md/core` workspace，但未向公共 npm registry 发布；继续使用独立默认主题。
-- `@resvg/resvg-js` 与 `sharp` 已在开发机实际加载，上游预编译支持矩阵覆盖 CI 的 Node 22/Linux x64 glibc。
+- `@resvg/resvg-js` 与 `sharp` 已在开发机和 GitHub Actions Node 22/Linux x64 glibc 环境实际加载。
 
 仍待核实：
 
-- 配置父仓库 remote 并首次运行 CI，确认锁文件实际选择了原生预编译包。
 - 首次公开预发布前再检索一次新出现的库形态微信排版方案。
 
 ## 5. 转发代理
 
-代码已完成：`services/yt-dlp-fastapi/app/wechat_proxy.py`，已在 `app/main.py` 挂载，测试在 `tests/test_wechat_proxy.py`，`access_log=False` 已设置，`.env.example` 与 README 已更新。
+外部代理服务的实现已完成并推送到其独立仓库分支 `feat/wechat-forwarding-proxy`。父项目只配置服务地址和令牌，不检出、构建或测试代理源码。
 
 剩下的是部署与验证：
 
 - 在代理主机配置 `WECHAT_PROXY_TOKEN`（与 `API_AUTH_TOKEN` 分开）
 - 把该主机 IP 填入公众平台白名单
 - 运行 `astro-wechat verify-proxy` 完成[部署自检](proxy-contract.md#7-部署自检)：401 / 403 / 原样透传；命令使用伪微信凭据
-- 确认前置反向代理与 APM 不记录完整 URL —— 这两处不在本仓库和 submodule 的控制范围内
-- submodule 改动已提交为 `78a7c39` 并推送到远端分支 `feat/wechat-forwarding-proxy`；合并该分支后再将父仓库指针更新到上游主分支提交
+- 确认前置反向代理与 APM 不记录完整 URL —— 这两处不在本仓库的控制范围内
+- 将外部代理仓库的 `feat/wechat-forwarding-proxy` 分支部署到固定 IP 主机；父仓库无需记录服务源码版本
 
 设计阶段的 `services/wechat-proxy-reference/` 已删除，避免保留一份会漂移的安全敏感代码副本。
 
