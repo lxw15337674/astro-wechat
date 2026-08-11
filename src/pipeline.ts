@@ -5,7 +5,7 @@ import { checkEligibility } from './eligibility.js'
 import { contentRoot, loadProjectConfig } from './project/config.js'
 import { discoverProjectRoot } from './project/discover.js'
 import { renderArticle } from './render/index.js'
-import { toArticleDocument, type AdapterOverrides } from './source/adapter.js'
+import { checkSourceEligibility, toArticleDocument, type AdapterOverrides } from './source/adapter.js'
 import { loadSourceArticle } from './source/load.js'
 import {
   synchronizeArticle,
@@ -54,11 +54,14 @@ export async function inspectArticle(
 ): Promise<ArticleInspection> {
   const warnings = new WarningCollector()
   const source = await loadSourceArticle(absolutePath, project.root)
-  const document = toArticleDocument(source, project, warnings, overrides)
+  const skipReason = checkSourceEligibility(source, project.config)
+  const document = toArticleDocument(source, project, warnings, overrides, {
+    allowMissingPublishFields: skipReason !== undefined,
+  })
 
   return {
     document,
-    skipReason: checkEligibility(document, project.config),
+    skipReason,
     warnings: warnings.warnings,
   }
 }
@@ -101,9 +104,12 @@ export async function publishArticle(
 ): Promise<ArticleResult> {
   const warnings = new WarningCollector()
   const source = await loadSourceArticle(absolutePath, project.root)
-  const document = toArticleDocument(source, project, warnings)
+  const earlySkipReason = checkSourceEligibility(source, project.config)
+  const document = toArticleDocument(source, project, warnings, {}, {
+    allowMissingPublishFields: earlySkipReason !== undefined && !(options.allowDraft && earlySkipReason === 'source-is-draft'),
+  })
 
-  const skipReason = checkEligibility(document, project.config)
+  const skipReason = earlySkipReason ?? checkEligibility(document, project.config)
   const ignorable = options.allowDraft && skipReason === 'source-is-draft'
 
   if (skipReason && !ignorable) {

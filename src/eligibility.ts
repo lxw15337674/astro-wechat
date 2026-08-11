@@ -1,5 +1,12 @@
-import type { ArticleDocument, ProjectConfig, SkipReason } from './types.js'
+import type { ProjectConfig, SkipReason, SourceArticle, WechatFrontmatter } from './types.js'
 import { normalizeRelativePath } from './util/text.js'
+
+export interface EligibilitySubject {
+  readonly draft: boolean
+  readonly tags: readonly string[]
+  readonly wechat: WechatFrontmatter
+  readonly source: Pick<SourceArticle, 'projectRelativePath'>
+}
 
 /**
  * Decide whether an article may be synchronized.
@@ -11,7 +18,7 @@ import { normalizeRelativePath } from './util/text.js'
  * Returns the reason for skipping, or `undefined` when eligible.
  */
 export function checkEligibility(
-  document: ArticleDocument,
+  document: EligibilitySubject,
   config: ProjectConfig,
 ): SkipReason | undefined {
   if (document.draft) return 'source-is-draft'
@@ -20,7 +27,7 @@ export function checkEligibility(
   return undefined
 }
 
-function passesConfigFilters(document: ArticleDocument, config: ProjectConfig): boolean {
+function passesConfigFilters(document: EligibilitySubject, config: ProjectConfig): boolean {
   const { eligibleTags, eligibleSourcePaths } = config
 
   if (eligibleTags && eligibleTags.length > 0) {

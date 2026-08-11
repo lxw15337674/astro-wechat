@@ -1,6 +1,7 @@
 import { basename, extname } from 'node:path'
 import { SourceValidationError, type WarningCollector } from '../errors.js'
-import type { ArticleDocument, ResolvedProject, SourceArticle, WechatFrontmatter } from '../types.js'
+import { checkEligibility } from '../eligibility.js'
+import type { ArticleDocument, ProjectConfig, ResolvedProject, SourceArticle, WechatFrontmatter } from '../types.js'
 import { stripMarkdown } from '../util/text.js'
 import { assertWithinLimit, fitDigest } from './validate.js'
 
@@ -9,12 +10,39 @@ export interface AdapterOverrides {
   readonly cover?: string
 }
 
+interface AdapterOptions {
+  /** Skip-only inspection must not require metadata that publishing needs. */
+  readonly allowMissingPublishFields?: boolean
+}
+
+/**
+ * Check the fields that decide whether publishing is even considered.
+ *
+ * This deliberately reads raw frontmatter: requiring a cover before learning
+ * that an article opted out turns unrelated historical posts into CI failures.
+ */
+export function checkSourceEligibility(
+  source: SourceArticle,
+  config: ProjectConfig,
+) {
+  return checkEligibility(
+    {
+      draft: source.frontmatter.draft === true,
+      tags: readTags(source.frontmatter.tags),
+      wechat: readWechat(source.frontmatter.wechat),
+      source,
+    },
+    config,
+  )
+}
+
 /** Map a parsed source file onto the normalized article. */
 export function toArticleDocument(
   source: SourceArticle,
   project: ResolvedProject,
   warnings: WarningCollector,
   overrides: AdapterOverrides = {},
+  options: AdapterOptions = {},
 ): ArticleDocument {
   const frontmatter = source.frontmatter
   const wechat = readWechat(frontmatter.wechat)
@@ -26,7 +54,7 @@ export function toArticleDocument(
     wechat.title,
     asString(frontmatter.title),
     firstHeading?.text,
-  )
+  ) ?? (options.allowMissingPublishFields ? basename(source.absolutePath, extname(source.absolutePath)) : undefined)
 
   if (!title) {
     throw new SourceValidationError(
@@ -36,24 +64,9 @@ export function toArticleDocument(
   }
   assertWithinLimit('title', title, sourcePath)
 
-  const cover = firstDefined(
-    overrides.cover,
-    wechat.cover,
-    readImageField(frontmatter.ogImage),
-    project.config.defaultCover,
-  )
-
-  if (!cover) {
-    throw new SourceValidationError(
-      '无法确定封面：frontmatter 没有 ogImage，配置也没有 defaultCover。微信草稿必须有封面。',
-      { code: 'cover-missing', sourcePath },
-    )
-  }
-
+  const body = stripLeadingTitleHeading(source.body, firstHeading, title)
   const author = firstDefined(wechat.author, asString(frontmatter.author), project.config.defaultAuthor)
   if (author) assertWithinLimit('author', author, sourcePath)
-
-  const body = stripLeadingTitleHeading(source.body, firstHeading, title)
 
   const rawDigest = firstDefined(
     wechat.digest,
@@ -63,7 +76,6 @@ export function toArticleDocument(
   const digest = fitDigest(rawDigest ?? '', warnings, sourcePath)
 
   const canonicalUrl = resolveCanonicalUrl(source, project, wechat, frontmatter)
-
   if (!canonicalUrl) {
     warnings.add({
       code: 'no-canonical-url',
@@ -71,6 +83,35 @@ export function toArticleDocument(
         '这篇文章没有 canonical URL，草稿身份将无法从微信侧恢复。配置 siteUrl，或显式设置 canonicalURL / wechat.sourceURL。',
       sourcePath,
     })
+  }
+
+  const cover = firstDefined(
+    overrides.cover,
+    wechat.cover,
+    readImageField(frontmatter.ogImage),
+    project.config.defaultCover,
+  )
+
+  if (!cover) {
+    if (options.allowMissingPublishFields) {
+      return {
+        sourceId: canonicalUrl ?? source.projectRelativePath,
+        canonicalUrl,
+        title,
+        body,
+        author,
+        digest,
+        cover: '',
+        draft: frontmatter.draft === true,
+        tags: readTags(frontmatter.tags),
+        wechat,
+        source,
+      }
+    }
+    throw new SourceValidationError(
+      '无法确定封面：frontmatter 没有 ogImage，配置也没有 defaultCover。微信草稿必须有封面。',
+      { code: 'cover-missing', sourcePath },
+    )
   }
 
   return {

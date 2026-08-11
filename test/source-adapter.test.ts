@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { WarningCollector } from '../src/errors.js'
+import { inspectArticle } from '../src/pipeline.js'
 import { toArticleDocument } from '../src/source/adapter.js'
 import { loadSourceArticle } from '../src/source/load.js'
 import { createFixtureProject, writePost, type FixtureProject } from './helpers/project.js'
@@ -165,5 +166,16 @@ describe('frontmatter parsing', () => {
     const resolved = await project.resolved()
 
     await expect(loadSourceArticle(path, resolved.root)).rejects.toThrow(/无法解析 YAML frontmatter/)
+  })
+
+  it('skips opted-out posts before requiring a WeChat cover', async () => {
+    const path = writePost(project, {
+      frontmatter: { ogImage: undefined, wechat: { enabled: false } },
+    })
+    const resolved = await project.resolved()
+    const inspection = await inspectArticle(path, resolved)
+
+    expect(inspection.skipReason).toBe('not-enabled')
+    expect(inspection.document.cover).toBe('')
   })
 })
