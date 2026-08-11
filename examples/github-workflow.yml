@@ -1,0 +1,104 @@
+# 微信草稿同步 job 示例。
+#
+# 放进 Astro 仓库的 .github/workflows/，或作为既有发布工作流的一个 job。
+# 完整背景见 docs/ci-integration.md。
+
+name: Sync WeChat drafts
+
+on:
+  workflow_call:
+    inputs:
+      article-paths:
+        description: 要同步的文章路径，空格分隔。留空则同步 HEAD~1..HEAD 的变更
+        required: false
+        type: string
+    secrets:
+      WECHAT_APP_ID:
+        required: true
+      WECHAT_APP_SECRET:
+        required: true
+      WECHAT_PROXY_URL:
+        required: true
+      WECHAT_PROXY_TOKEN:
+        required: true
+
+# 按账户划分，且不取消进行中的任务。
+#
+# 取消一个正在创建草稿的任务会留下结果不明的状态，下一次运行必须先与微信
+# 核对才能继续；更糟的是台账可能没来得及写入。宁可排队也不要中断。
+concurrency:
+  group: wechat-sync-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # 密钥放在受保护的 environment 里，只有这个 job 能拿到。
+    environment: wechat-production
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # publish-changed 需要比较两个修订，浅检出拿不到父提交。
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install -g @bhwa233/astro-wechat
+
+      # 先看一遍会发生什么，再真的写。dry-run 会完整走到创建决策，
+      # 包括台账查询和渲染，因此它能回答 inspect 回答不了的问题：
+      # 这篇会被跳过还是会新建。
+      - name: Dry run
+        env:
+          WECHAT_APP_ID: ${{ secrets.WECHAT_APP_ID }}
+          WECHAT_APP_SECRET: ${{ secrets.WECHAT_APP_SECRET }}
+          WECHAT_PROXY_URL: ${{ secrets.WECHAT_PROXY_URL }}
+          WECHAT_PROXY_TOKEN: ${{ secrets.WECHAT_PROXY_TOKEN }}
+        run: |
+          if [ -n "${{ inputs.article-paths }}" ]; then
+            astro-wechat publish ${{ inputs.article-paths }} --dry-run --json
+          else
+            astro-wechat publish-changed --dry-run --json
+          fi
+
+      - name: Publish
+        id: publish
+        env:
+          WECHAT_APP_ID: ${{ secrets.WECHAT_APP_ID }}
+          WECHAT_APP_SECRET: ${{ secrets.WECHAT_APP_SECRET }}
+          WECHAT_PROXY_URL: ${{ secrets.WECHAT_PROXY_URL }}
+          WECHAT_PROXY_TOKEN: ${{ secrets.WECHAT_PROXY_TOKEN }}
+        run: |
+          if [ -n "${{ inputs.article-paths }}" ]; then
+            astro-wechat publish ${{ inputs.article-paths }} --json | tee results.json
+          else
+            astro-wechat publish-changed --json | tee results.json
+          fi
+
+      # 台账必须提交回仓库：它是「这篇发过没有」的唯一记录，丢了下次运行
+      # 就会重复创建。注意让生成类工作流忽略这类提交，否则两个工作流会
+      # 互相触发。
+      - name: Commit ledger
+        if: always()
+        run: |
+          if git diff --quiet -- .astro-wechat/ledger.json; then
+            echo "台账无变化"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .astro-wechat/ledger.json
+          git commit -m "chore: 更新微信同步台账 [skip ci]"
+          git push
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wechat-sync-results
+          path: results.json

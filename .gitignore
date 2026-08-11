@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Preview output is disposable. The ledger in the same directory is not, and
+# must never be ignored — losing it means the next run cannot tell an already
+# published article from a new one.
+.astro-wechat/preview/

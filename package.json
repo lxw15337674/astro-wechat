@@ -1,0 +1,78 @@
+{
+  "name": "@bhwa233/astro-wechat",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Synchronize Astro Markdown articles to the WeChat Official Account draft box.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./integration": {
+      "types": "./dist/integration.d.ts",
+      "import": "./dist/integration.js"
+    }
+  },
+  "bin": {
+    "astro-wechat": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "astro",
+    "astro-integration",
+    "wechat",
+    "weixin",
+    "markdown",
+    "publishing"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bhwa233/astro-wechat.git"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "astro": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "astro": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "cac": "^7.0.0",
+    "cheerio": "^1.2.0",
+    "gray-matter": "^4.0.3",
+    "juice": "^12.1.2",
+    "markdown-it": "^15.0.0",
+    "markdown-it-footnote": "^4.0.0",
+    "sanitize-html": "^2.17.6"
+  },
+  "optionalDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^26.2.0",
+    "@types/sanitize-html": "^2.16.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
