@@ -35,7 +35,9 @@ const DRAFT = {
 /** Answers the token request, then delegates everything else. */
 function withToken(handler: MockHandler): MockHandler {
   return (call, index) => {
-    if (call.url.pathname.endsWith('/cgi-bin/stable_token')) return jsonResponse(TOKEN_OK)
+    if (call.upstreamUrl.pathname.endsWith('/cgi-bin/stable_token')) {
+      return call.url.pathname === '/v2/proxy' ? proxyResponse(TOKEN_OK) : jsonResponse(TOKEN_OK)
+    }
     return handler(call, index)
   }
 }
@@ -257,9 +259,9 @@ describe('出口：代理与直连', () => {
     proxyToken: 'proxy-token',
   })
 
-  it('配置代理时加前缀并携带 Bearer 令牌', async () => {
+  it('配置代理时通过 /v2/proxy 发送完整目标和 Bearer 令牌', async () => {
     const { client: wechat, mock } = client(
-      withToken(() => jsonResponse({ media_id: 'draft-1' })),
+      withToken(() => proxyResponse({ media_id: 'draft-1' })),
       proxyConfig,
     )
 
@@ -267,8 +269,32 @@ describe('出口：代理与直连', () => {
 
     const call = mock.calls.at(-1)!
     expect(call.url.origin).toBe('https://proxy.example.com')
-    expect(call.url.pathname).toBe('/wechat/cgi-bin/draft/add')
+    expect(call.url.pathname).toBe('/v2/proxy')
+    expect(call.method).toBe('POST')
+    expect(call.headers.get('x-proxy-target')).toContain('/cgi-bin/draft/add?access_token=token-abc')
+    expect(call.headers.get('x-proxy-method')).toBe('POST')
     expect(call.headers.get('authorization')).toBe('Bearer proxy-token')
+    expect(parseJsonBody(call.body).articles).toBeDefined()
+  })
+
+  it('multipart 上传保留 fetch 生成的 boundary 和原始字节', async () => {
+    const { client: wechat, mock } = client(
+      withToken(() => proxyResponse({ url: 'https://mmbiz.qpic.cn/x' })),
+      proxyConfig,
+    )
+
+    await wechat.uploadBodyImage(IMAGE)
+
+    const call = mock.calls.at(-1)!
+    const contentType = call.headers.get('content-type')
+    expect(contentType).toMatch(/^multipart\/form-data; boundary=/)
+    const bytes = new Uint8Array(call.body as ArrayBuffer)
+    const multipart = new TextDecoder().decode(bytes)
+    expect(multipart).toContain('filename="cover.png"')
+    expect(multipart).toContain('Content-Type: image/png')
+    expect(bytes).toContain(1)
+    expect(bytes).toContain(2)
+    expect(bytes).toContain(3)
   })
 
   it('未配置代理时直连微信，且不带令牌', async () => {
@@ -284,7 +310,7 @@ describe('出口：代理与直连', () => {
 
   it('代理拒绝时归为 proxy 类，而不是微信错误', async () => {
     const { client: wechat } = client(
-      () => jsonResponse({ detail: 'forbidden' }, 403),
+      () => proxyErrorResponse({ detail: 'forbidden', error_code: 'target_not_allowed' }, 403),
       proxyConfig,
     )
 
@@ -302,6 +328,31 @@ describe('出口：代理与直连', () => {
     await expect(wechat.uploadBodyImage(IMAGE)).rejects.toThrow(/未按原样透传/)
   })
 
+  it('代理透传的微信 403 仍归为微信错误', async () => {
+    const { client: wechat } = client(
+      () => proxyResponse({ errcode: 48001 }, 403),
+      proxyConfig,
+    )
+
+    const error = await wechat.uploadBodyImage(IMAGE).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(WechatApiError)
+    expect(error).not.toBeInstanceOf(ProxyError)
+  })
+
+  it('非幂等写入在代理上游超时后报告结果不明', async () => {
+    const { client: wechat } = client(
+      withToken(() =>
+        proxyErrorResponse(
+          { detail: 'timed out', error_code: 'upstream_timeout' },
+          504,
+        ),
+      ),
+      proxyConfig,
+    )
+
+    await expect(wechat.createDraft(DRAFT)).rejects.toBeInstanceOf(OutcomeUnknownError)
+  })
+
   it('直连时的 403 是微信的回答，不能被改标成代理错误', async () => {
     const { client: wechat } = client(() => jsonResponse({ errcode: 48001 }, 403))
 
@@ -309,6 +360,18 @@ describe('出口：代理与直连', () => {
     expect(error).not.toBeInstanceOf(ProxyError)
   })
 })
+
+function proxyResponse(body: unknown, status = 200): Response {
+  const response = jsonResponse(body, status)
+  response.headers.set('X-Proxy-Result', 'upstream')
+  return response
+}
+
+function proxyErrorResponse(body: unknown, status: number): Response {
+  const response = jsonResponse(body, status)
+  response.headers.set('X-Proxy-Result', 'proxy-error')
+  return response
+}
 
 describe('配置读取', () => {
   const base = { WECHAT_APP_ID: 'id', WECHAT_APP_SECRET: 'secret' }

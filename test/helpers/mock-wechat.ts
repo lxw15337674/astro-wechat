@@ -2,6 +2,8 @@ import type { WechatConfig } from '../../src/wechat/config.js'
 
 export interface MockCall {
   readonly url: URL
+  /** The logical upstream URL; differs from `url` when `/v2/proxy` is used. */
+  readonly upstreamUrl: URL
   readonly method: string
   readonly headers: Headers
   readonly body: unknown
@@ -33,6 +35,7 @@ export function createMockFetch(handler: MockHandler): MockFetch {
     const url = new URL(typeof input === 'string' ? input : input.toString())
     const call: MockCall = {
       url,
+      upstreamUrl: new URL(new Headers(init?.headers).get('x-proxy-target') ?? url.href),
       method: init?.method ?? 'GET',
       headers: new Headers(init?.headers),
       body: init?.body,
@@ -44,7 +47,7 @@ export function createMockFetch(handler: MockHandler): MockFetch {
   return {
     fetch: impl,
     calls,
-    callsTo: (suffix) => calls.filter((call) => call.url.pathname.endsWith(suffix)),
+    callsTo: (suffix) => calls.filter((call) => call.upstreamUrl.pathname.endsWith(suffix)),
   }
 }
 
@@ -76,5 +79,6 @@ export function testConfig(overrides: Partial<WechatConfig> = {}): WechatConfig 
 }
 
 export function parseJsonBody(body: unknown): Record<string, unknown> {
-  return JSON.parse(String(body)) as Record<string, unknown>
+  const text = body instanceof ArrayBuffer ? new TextDecoder().decode(body) : String(body)
+  return JSON.parse(text) as Record<string, unknown>
 }

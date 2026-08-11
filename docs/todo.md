@@ -10,9 +10,9 @@
 pnpm run typecheck && pnpm test && pnpm run build
 ```
 
-结果：类型检查通过，当前 138 项测试全部通过，声明与 JavaScript 构建成功。代理按外部服务地址接入，不属于本仓库依赖；废弃的 `docs/gateway-contract.md` 已删除，工作分支为 `feat/milestone-1-to-5`。
+结果：类型检查通过，当前 141 项测试全部通过，声明与 JavaScript 构建成功。代理按外部服务地址接入，不属于本仓库依赖；废弃的 `docs/gateway-contract.md` 已删除，工作分支为 `feat/milestone-1-to-5`。
 
-公开父仓库已创建并推送。GitHub Actions 的 Node 22/`ubuntu-latest` job 已实际加载 `sharp` 与 `@resvg/resvg-js`，并通过类型检查、138 项测试和构建。
+公开父仓库已创建并推送。GitHub Actions 的 Node 22/`ubuntu-latest` job 已实际加载 `sharp` 与 `@resvg/resvg-js`；本地当前通过类型检查、141 项测试和构建。
 
 npm 包名已确定为 `@lxw15337674/astro-wechat`。本机 `npm whoami` 返回 `lxw15337674`，`npm access list packages lxw15337674` 显示该个人 scope 下已有包具备 `read-write` 权限；新包当前尚未发布。
 
@@ -35,7 +35,6 @@ npm 包名已确定为 `@lxw15337674/astro-wechat`。本机 `npm whoami` 返回 
 | 事项 | 为什么 | 不做的后果 |
 | --- | --- | --- |
 | 确认公众号「素材管理」「草稿箱」接口权限已开通 | 要登录公众平台后台 | 未认证个人订阅号调不通，整个包无法工作 |
-| 代理机器的 HTTPS 域名与证书 | 你的机器 | 代理必须是 HTTPS，凭据会经过这条链路 |
 | 用真实文章跑 `preview` 看排版 | 只有你知道好不好看 | 主题 CSS 大概率要调一轮 |
 | 定哪些 AstroPaper 定时任务加 `wechat.enabled: true` | 内容策略 | — |
 
@@ -53,7 +52,7 @@ npm 包名已确定为 `@lxw15337674/astro-wechat`。本机 `npm whoami` 返回 
 
 已核实：
 
-- 外部代理服务已有 `httpx` 依赖，转发端点不引入新包；服务已有的通用 `/v1/proxy` 不能复用（不支持 multipart 二进制体，且目标不受限、令牌共用）。
+- 外部代理服务已有 `httpx` 依赖；新增通用 `/v2/proxy` 流式透传 multipart/二进制体，并以部署策略限制目标、方法和体积。`/v1/proxy` 保持兼容。
 - `doocs/md` 使用 WTFPL，内部有 `@md/core` workspace，但未向公共 npm registry 发布；继续使用独立默认主题。
 - `@resvg/resvg-js` 与 `sharp` 已在开发机和 GitHub Actions Node 22/Linux x64 glibc 环境实际加载。
 
@@ -63,15 +62,20 @@ npm 包名已确定为 `@lxw15337674/astro-wechat`。本机 `npm whoami` 返回 
 
 ## 5. 转发代理
 
-外部代理服务的实现已完成并推送到其独立仓库分支 `feat/wechat-forwarding-proxy`。父项目只配置服务地址和令牌，不检出、构建或测试代理源码。
+外部代理服务的 `/v2/proxy` 已合并到其 `main` 分支并部署。父项目只配置服务地址和令牌，不检出、构建或测试代理源码。
 
-剩下的是部署与验证：
+已完成：
 
-- 在代理主机配置 `WECHAT_PROXY_TOKEN`（与 `API_AUTH_TOKEN` 分开）
-- 把该主机 IP 填入公众平台白名单
-- 运行 `astro-wechat verify-proxy` 完成[部署自检](proxy-contract.md#7-部署自检)：401 / 403 / 原样透传；命令使用伪微信凭据
-- 确认前置反向代理与 APM 不记录完整 URL —— 这两处不在本仓库的控制范围内
-- 将外部代理仓库的 `feat/wechat-forwarding-proxy` 分支部署到固定 IP 主机；父仓库无需记录服务源码版本
+- `https://rain-api.bhwa233.com` 的 HTTPS 域名、证书与健康检查可用
+- 代理主机已配置只允许 `api.weixin.qq.com`、HTTPS 443 和 GET/POST 的 `PROXY_V2_*` 策略
+- 外部服务 `main` 已包含 `/v2/proxy`，固定 IP 主机已部署并重启
+- `astro-wechat verify-proxy` 已在线验证 401、策略外目标 403，以及微信 HTTP 200 / 非零 `errcode` 原样透传
+- GitHub Actions Secrets 已配置 `WECHAT_PROXY_URL` 与 `WECHAT_PROXY_TOKEN`；后者使用服务端 `API_AUTH_TOKEN` 的值
+
+仍需人工确认：
+
+- 把固定出口 IP 填入公众平台 IP 白名单
+- 确认 Cloudflare、源站反向代理与 APM 不采集完整 `X-Proxy-Target` 或请求体
 
 设计阶段的 `services/wechat-proxy-reference/` 已删除，避免保留一份会漂移的安全敏感代码副本。
 

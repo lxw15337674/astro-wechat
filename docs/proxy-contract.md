@@ -1,121 +1,126 @@
 # 转发代理契约
 
-固定 IP 主机上的转发端点与 Node 侧微信客户端之间的接口。ADR-0005 决定了为什么存在这一层。
+固定 IP 主机上的通用转发端点与 Node 微信客户端之间的接口。ADR-0005 说明了为什么存在这一层。
 
-代理**不理解微信**。它不解析响应体、不认识 `errcode`、不持有微信凭据。所有微信协议知识都在 Node 侧，这正是相对 ADR-0004 的取舍所在。
+代理**不理解微信**。它不解析响应体、不认识 `errcode`、不持有微信凭据。微信协议知识全部留在 Node 侧。代理独立部署，本仓库只通过 `WECHAT_PROXY_URL` 与 `WECHAT_PROXY_TOKEN` 使用它。
 
-代理是独立部署的外部服务。本仓库只定义调用契约，并通过 `WECHAT_PROXY_URL` 指向部署地址。
+## 1. 请求协议
 
-## 1. 转发规则
+所有代理请求的外层方法固定为：
 
-```
-<方法> https://<代理主机>/wechat/<路径>?<查询串>
-        │
-        └──转发──▶ https://api.weixin.qq.com/<路径>?<查询串>
+```text
+POST https://<代理主机>/v2/proxy
 ```
 
-- 目标主机**固定为 `api.weixin.qq.com`**，写在代理配置里，绝不从请求中读取。
-- 路径、查询串、请求体、`Content-Type` 原样透传。
-- 上游的状态码、`Content-Type`、响应体原样返回。
-- 不跟随重定向。上游若返回 3xx，把它当作响应交给调用方。
+控制信息通过请求头传递：
 
-原样返回是关键：Node 侧的错误分类依赖看到真实的微信响应，包括 HTTP 200 里的 `errcode`。代理任何形式的「帮忙处理」都会破坏这一点。
-
-## 2. 认证
-
-```
+```http
 Authorization: Bearer <WECHAT_PROXY_TOKEN>
+X-Proxy-Target: https://api.weixin.qq.com/<路径>?<查询串>
+X-Proxy-Method: GET|POST
+Content-Type: <上游 Content-Type，可选>
 ```
 
-常量时间比较。仅 HTTPS。
+外层 body 就是上游 body 的原始字节，可以是 JSON、multipart 或二进制。`Content-Type`、`Content-Encoding`、`Accept`、`Accept-Language` 和 `User-Agent` 会直接传给上游；额外上游头使用 `X-Proxy-Upstream-<名称>`。代理认证头绝不会转发。
 
-令牌与微信凭据分开配置，可独立轮换。
+代理不跟随重定向。上游状态码、安全响应头和原始响应体直接返回，并增加：
 
-**代理访问权就是操作公众号的能力边界**：因为微信侧有 IP 白名单，即使同时拿到 AppSecret 和 access token，没有代理访问权也调不通。
+```http
+X-Proxy-Result: upstream
+```
 
-## 3. 路径白名单
+代理自身产生的转发失败返回 JSON `detail` 与稳定的 `error_code`；认证失败返回 `detail`。两者都标记：
 
-只放行同步草稿实际需要的路径。默认：
+```http
+X-Proxy-Result: proxy-error
+```
 
-| 路径 | 用途 |
-| --- | --- |
-| `/cgi-bin/stable_token` | 获取 access token |
-| `/cgi-bin/media/uploadimg` | 上传正文图片 |
-| `/cgi-bin/material/add_material` | 上传封面为永久素材 |
-| `/cgi-bin/draft/add` | 创建草稿 |
-| `/cgi-bin/draft/batchget` | 按 source-URL 查找草稿 |
-| `/cgi-bin/material/del_material` | 删除孤儿封面素材，默认关闭 |
+这个标记让 Node 侧能区分「代理拒绝」和「微信返回 401/403」。微信 HTTP 200 中的非零 `errcode` 仍由 Node 解析。
 
-白名单之外返回 `403`。
+## 2. 认证与部署变量
 
-这条限制的价值在于泄露后的爆炸半径：白名单里没有群发接口，令牌泄露就变不成群发。删除素材的路径默认关闭，运维清理时临时打开。
+`astro-wechat` 使用变量名 `WECHAT_PROXY_TOKEN`；当前通用服务端用 `API_AUTH_TOKEN` 校验。部署时两者填入同一个令牌值：
 
-方法只放行 `GET` 与 `POST`。
+```text
+astro-wechat: WECHAT_PROXY_TOKEN ──Bearer──▶ 服务端: API_AUTH_TOKEN
+```
 
-## 4. 限制与超时
+它与 `WECHAT_APP_ID`、`WECHAT_APP_SECRET` 是不同凭据，但与该服务的其他受保护 API 共用。轮换 `API_AUTH_TOKEN` 时必须同步更新调用方的 `WECHAT_PROXY_TOKEN`。只允许通过 HTTPS 公网地址调用代理。
 
-| 项 | 取值 |
-| --- | --- |
-| 请求体上限 | 与微信对应接口一致，取最宽者 |
-| 响应体上限 | 足够容纳草稿列表分页响应 |
-| 连接与读取超时 | 与 Node 侧客户端的超时对齐 |
+## 3. 目标策略
 
-超时与体积上限必须与微信接口的真实限制对齐。定得比微信更严，会在这一层制造出微信本身不会返回的错误，让调用方按错误的原因去排查。
+`/v2/proxy` 是通用协议，部署实例通过环境变量收紧能力：
 
-上游超时时返回 `504`，且**响应体为空**。Node 侧据此判定「结果不明」，不得重试写操作。
+```dotenv
+PROXY_V2_ALLOWED_HOSTS=api.weixin.qq.com
+PROXY_V2_ALLOWED_METHODS=GET,POST
+PROXY_V2_ALLOWED_SCHEMES=https
+PROXY_V2_ALLOWED_PORTS=443
+```
+
+主机使用精确匹配，不支持通配符。目标还必须解析到公网地址，带认证信息、fragment、内网、回环、链路本地地址的 URL 会被拒绝。策略以外返回 `403`，方法不允许返回 `405`。
+
+这里限制的是主机、协议、端口和方法，**不是微信路径白名单**。因此令牌与微信凭据同时泄露时，可以调用该主机上的其他微信接口。需要更窄的发布能力边界时，应改用 ADR-0004 的业务网关方案，而不是把微信知识塞进通用代理。
+
+## 4. 限制、超时与结果不明
+
+服务端通过以下变量限制资源：
+
+| 变量 | 默认值 |
+| --- | ---: |
+| `PROXY_V2_MAX_REQUEST_BYTES` | 25 MiB |
+| `PROXY_V2_MAX_RESPONSE_BYTES` | 25 MiB |
+| `PROXY_V2_TIMEOUT_SECONDS` | 30 秒 |
+
+请求体超限返回 `413/request_too_large`；响应体超限返回 `502/response_too_large`；连接失败返回 `502/upstream_unreachable`；超时返回 `504/upstream_timeout`。
+
+非幂等微信写入遇到后三类失败时，上游可能已经执行。Node 侧会报告「结果不明」且不自动重试，必须先与微信协调远程状态。
 
 ## 5. 日志
 
-**绝不记录 query string 和请求体。**
+**绝不记录 `X-Proxy-Target` 完整值和请求体。** 微信把 `access_token` 放在目标 query 中，token 请求体里有 AppSecret。反向代理、应用访问日志和 APM 都必须遵守这一点。
 
-微信把 `access_token` 放在 query 里，token 请求的 body 里有 AppSecret。代理虽然不存储凭据，但它看得见 —— 一行普通的 access log 就足以把两者落盘。
-
-可以记录：时间、方法、路径（不含 query）、上游状态码、耗时、字节数。
+可以记录：时间、代理端点、上游主机、上游方法、状态码、耗时和字节数。日志中的上游 URL 必须去掉 query。
 
 ## 6. 直连回退
 
-未配置代理地址时，Node 客户端直连 `api.weixin.qq.com`。
-
-用于已列入白名单的机器上本地调试，以及代理故障时的应急通道。CI 必须配置代理，托管 runner 直连必然失败。
+未配置 `WECHAT_PROXY_URL` 时，Node 客户端直连 `api.weixin.qq.com`。这用于已列入微信 IP 白名单的机器本地调试，也是一条应急通道。GitHub 托管 runner 必须配置代理。
 
 ## 7. 部署自检
 
-部署后优先运行自动自检；它使用固定伪凭据，不会接触生产 AppSecret：
+自检使用伪微信凭据，不接触生产 AppSecret：
 
 ```bash
 WECHAT_PROXY_URL=https://你的代理 \
-WECHAT_PROXY_TOKEN=你的独立代理令牌 \
+WECHAT_PROXY_TOKEN=服务端的API_AUTH_TOKEN \
 astro-wechat verify-proxy
 ```
 
-命令会验证无认证返回 401、群发路径返回 403，以及伪凭据触发的微信错误仍以 HTTP 200 和 `errcode` 原样返回。需要逐项诊断时可使用等价 curl：
+命令验证三件事：缺少认证返回 401；策略外目标返回 403；伪凭据触发的微信错误仍以 HTTP 200 和非零 `errcode` 原样返回。
+
+等价的逐项请求都发往 `/v2/proxy`：
 
 ```bash
-# 应当返回 401
-curl -i https://你的代理/wechat/cgi-bin/stable_token
+# 缺少认证，应为 401
+curl -i -X POST https://你的代理/v2/proxy \
+  -H 'X-Proxy-Target: https://api.weixin.qq.com/cgi-bin/stable_token' \
+  -H 'X-Proxy-Method: GET'
 
-# 应当返回 403：群发接口不在白名单里
-curl -i -H "Authorization: Bearer $WECHAT_PROXY_TOKEN" \
-  https://你的代理/wechat/cgi-bin/message/mass/send
+# 策略外主机，应为 403
+curl -i -X POST https://你的代理/v2/proxy \
+  -H "Authorization: Bearer $WECHAT_PROXY_TOKEN" \
+  -H 'X-Proxy-Target: https://example.com/' \
+  -H 'X-Proxy-Method: GET'
 
-# 应当返回微信的真实响应
-curl -i -H "Authorization: Bearer $WECHAT_PROXY_TOKEN" \
+# 微信真实响应，应为 HTTP 200 且 body 含非零 errcode
+curl -i -X POST https://你的代理/v2/proxy \
+  -H "Authorization: Bearer $WECHAT_PROXY_TOKEN" \
+  -H 'X-Proxy-Target: https://api.weixin.qq.com/cgi-bin/stable_token' \
+  -H 'X-Proxy-Method: POST' \
   -H 'Content-Type: application/json' \
-  -d '{"grant_type":"client_credential","appid":"x","secret":"y"}' \
-  https://你的代理/wechat/cgi-bin/stable_token
+  -d '{"grant_type":"client_credential","appid":"x","secret":"y"}'
 ```
-
-第三条**必须是 HTTP 200 且 body 里有 `errcode`**。这说明代理原样透传，没有替调用方「处理」错误 —— 一旦它把 errcode 翻译成 HTTP 状态码，Node 侧的错误分类就全错了。
-
-日志方面还要确认两处，它们不在本仓库的控制范围内：
-
-- 前置的 Nginx / Caddy 是否记录完整 URL
-- APM 或错误上报 SDK 是否采集 URL 与请求体
-
-`access_token` 在 query 里，AppSecret 在 token 请求的 body 里，任一处记全就等于凭据落盘。
 
 ## 8. 变更流程
 
-代理不理解微信，因此增加微信接口调用通常**不需要改代理代码**，只需要在路径白名单里加一行配置。
-
-需要改代理实现的情况只有：转发语义变化、限制值调整、认证方式变化。这类改动要同时发布代理服务的新版本并更新本文，但不需要改 npm 项目的源码依赖。
+增加微信接口调用通常不需要改代理代码。只有新增主机、协议、端口或方法时才调整 `PROXY_V2_*` 策略；转发语义、限制或认证变化则必须同时发布代理服务并更新本文。

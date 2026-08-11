@@ -72,7 +72,7 @@ ADR-0005 把微信协议实现留在 Node，因此这一条覆盖全部微信调
 
 ### 已核实
 
-**Node 依赖版本与可安装性**（2026-08-11，pnpm）。全部安装成功，里程碑 1-5 的 138 项测试与 `build` 在这套版本下通过：
+**Node 依赖版本与可安装性**（2026-08-11，pnpm）。全部安装成功，里程碑 1-5 的 141 项测试与 `build` 在这套版本下通过：
 
 | 包 | 版本范围 |
 | --- | --- |
@@ -86,7 +86,7 @@ ADR-0005 把微信协议实现留在 Node，因此这一条覆盖全部微信调
 | `@resvg/resvg-js`（可选） | `^2.6.2` |
 | `sharp`（可选） | `^0.35.3` |
 
-两个可选原生模块在开发机（Linux x64/WSL）上安装并实际加载成功：`sharp` 0.35.3 使用 libvips 8.18.3，`@resvg/resvg-js` 2.6.2 成功加载原生 `Resvg`。GitHub Actions 的 Node 22/`ubuntu-latest` check job 也已从锁文件安装并实际加载二者，随后通过类型检查、138 项测试和构建。
+两个可选原生模块在开发机（Linux x64/WSL）上安装并实际加载成功：`sharp` 0.35.3 使用 libvips 8.18.3，`@resvg/resvg-js` 2.6.2 成功加载原生 `Resvg`。GitHub Actions 的 Node 22/`ubuntu-latest` check job 也已从锁文件安装并实际加载二者；本地当前通过类型检查、141 项测试和构建。
 
 集成时暴露并已解决的类型问题，记录于此以免重犯：
 
@@ -114,7 +114,7 @@ yt-dlp>=2026.2.21,<2027.0.0
 两项与安全相关的现状：
 
 - **该服务已有通用转发端点 `/v1/proxy`，但不能复用**。理由见 ADR-0005 第 2 条，其中「不支持 multipart 请求体」是硬阻塞。
-- **uvicorn access log 会泄露 access token**。access log 记录完整请求行含 query string，而微信把 `access_token` 放在 query 里。已通过在 `uvicorn.run()` 传 `access_log=False` 解决，代理端点自行输出不含 query 的日志行。前置反向代理与 APM 仍需单独确认。
+- **日志不得采集代理控制头或 body**。`/v2/proxy` 的外层请求行只有固定路径，不含微信 query；但完整目标位于 `X-Proxy-Target`，token 请求体含 AppSecret。uvicorn 默认访问日志只记录外层请求行，前置反向代理与 APM 仍需确认不会采集完整请求头或 body。
 
 ### 待核实
 
