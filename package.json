@@ -1,5 +1,5 @@
 {
-  "name": "@bhwa233/astro-wechat",
+  "name": "@lxw15337674/astro-wechat",
   "version": "0.0.0",
   "private": true,
   "description": "Synchronize Astro Markdown articles to the WeChat Official Account draft box.",
@@ -34,7 +34,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bhwa233/astro-wechat.git"
+    "url": "git+https://github.com/lxw15337674/astro-wechat.git"
   },
   "sideEffects": false,
   "publishConfig": {

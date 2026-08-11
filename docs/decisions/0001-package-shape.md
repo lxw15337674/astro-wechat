@@ -23,7 +23,7 @@
 
 Astro 集成绝不会在 `astro dev`、`astro sync` 或 `astro build` 期间自动发布。
 
-暂定包名为 `@bhwa233/astro-wechat`，具体取决于 npm 名称和账户核验。
+包名确定为 `@lxw15337674/astro-wechat`；发布前仍需登录 npm 核验账户权限。
 
 ## 后果
 

@@ -48,7 +48,7 @@ jobs:
         with:
           node-version: 22
 
-      - run: npm install -g @bhwa233/astro-wechat
+      - run: npm install -g @lxw15337674/astro-wechat
 
       # 先看一遍会发生什么，再真的写。dry-run 会完整走到创建决策，
       # 包括台账查询和渲染，因此它能回答 inspect 回答不了的问题：
