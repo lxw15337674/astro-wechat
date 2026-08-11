@@ -3,6 +3,7 @@ import {
   chooseOutputFormat,
   contentTypeFor,
   decodeDataUri,
+  downloadRemoteImage,
   isSvgDataUri,
 } from '../src/image/normalize.js'
 import { TINY_PNG_BASE64 } from './helpers/project.js'
@@ -62,5 +63,30 @@ describe('内联 SVG 识别', () => {
 
   it('不误判其他图片类型', () => {
     expect(isSvgDataUri(`data:image/png;base64,${TINY_PNG_BASE64}`)).toBe(false)
+  })
+})
+
+describe('远程图片下载', () => {
+  it('只下载配置白名单中的图片主机', async () => {
+    const request = async () => new Response(new Uint8Array([1, 2, 3]), {
+      headers: { 'content-type': 'image/jpeg' },
+    })
+
+    await expect(downloadRemoteImage('https://images.example.com/book.jpg', ['images.example.com'], request)).resolves.toEqual(
+      new Uint8Array([1, 2, 3]),
+    )
+    await expect(downloadRemoteImage('https://other.example.com/book.jpg', ['images.example.com'], request)).rejects.toThrow(
+      /白名单/,
+    )
+  })
+
+  it('拒绝不是图片的远程响应', async () => {
+    const request = async () => new Response('not an image', {
+      headers: { 'content-type': 'text/html' },
+    })
+
+    await expect(downloadRemoteImage('https://images.example.com/book.jpg', ['images.example.com'], request)).rejects.toThrow(
+      /不是图片/,
+    )
   })
 })

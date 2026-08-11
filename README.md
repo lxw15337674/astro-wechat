@@ -68,11 +68,15 @@ export default {
   defaultAuthor: '作者名',
   defaultCover: '/images/default-cover.png',
   theme: 'default',
+  // 仅在真正上传时下载这些主机的远程图片；不配则拒绝所有远程图片。
+  remoteImageHosts: ['images.example.com'],
   ledgerPath: '.astro-wechat/ledger.json',
 }
 ```
 
 **`siteUrl` 值得配。** 没有它，文章就没有 canonical URL，草稿身份无法从微信侧恢复；一旦台账丢失或某次同步结果不明，就只能人工去草稿箱确认。
+
+远程图片默认不下载。确有外链封面或正文图片时，必须通过 `remoteImageHosts` 显式列出精确域名；重定向、非图片响应与超出 20 MiB 的响应都会被拒绝。
 
 ### 命令
 

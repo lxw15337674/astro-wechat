@@ -122,6 +122,8 @@ export interface ProjectConfig {
   readonly theme: string
   readonly eligibleTags?: readonly string[]
   readonly eligibleSourcePaths?: readonly string[]
+  /** Exact hostnames permitted when downloading remote images for WeChat upload. */
+  readonly remoteImageHosts?: readonly string[]
   readonly previewDir: string
   /**
    * Ledger location, relative to the project root.

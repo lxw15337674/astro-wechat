@@ -11,6 +11,13 @@ export interface NormalizedImage {
   readonly filename: string
 }
 
+export interface NormalizeImageOptions {
+  /** Exact hostnames permitted for remote image downloads. Empty denies all remote downloads. */
+  readonly remoteImageHosts?: readonly string[]
+}
+
+type ImageFetch = (input: URL, init?: RequestInit) => Promise<Response>
+
 /** Formats the target endpoint accepts, by role. */
 function limitsFor(role: AssetRole) {
   return role === 'cover' ? COVER_UPLOAD : BODY_IMAGE_UPLOAD
@@ -50,8 +57,9 @@ const QUALITY_LADDER = [82, 70, 58, 45] as const
 export async function normalizeImage(
   asset: AssetIdentity,
   warnings: WarningCollector,
+  options: NormalizeImageOptions = {},
 ): Promise<NormalizedImage> {
-  const source = await readSourceBytes(asset)
+  const source = await readSourceBytes(asset, options)
   const role = asset.reference.role
   const limits = limitsFor(role)
 
@@ -171,7 +179,7 @@ async function encodeWithinLimit(
   )
 }
 
-async function readSourceBytes(asset: AssetIdentity): Promise<Uint8Array> {
+async function readSourceBytes(asset: AssetIdentity, options: NormalizeImageOptions): Promise<Uint8Array> {
   const { reference } = asset
 
   if (reference.kind === 'data-uri') {
@@ -189,10 +197,7 @@ async function readSourceBytes(asset: AssetIdentity): Promise<Uint8Array> {
   }
 
   if (reference.kind === 'remote') {
-    throw new AssetError(
-      `远程图片需要先下载：${reference.url}。里程碑 2 暂不实现远程下载。`,
-      { code: 'remote-download-unimplemented' },
-    )
+    return downloadRemoteImage(reference.url ?? '', options.remoteImageHosts ?? [])
   }
 
   if (reference.kind === 'wechat-hosted') {
@@ -216,6 +221,100 @@ async function readSourceBytes(asset: AssetIdentity): Promise<Uint8Array> {
   }
 
   return new Uint8Array(bytes)
+}
+
+/**
+ * Download an allowlisted remote image with bounds checked before decoding.
+ *
+ * Rendering remains network-free; this is called only during an actual upload.
+ * Exact hostname matching keeps article content from turning the publishing
+ * runner into a general-purpose network client.
+ */
+export async function downloadRemoteImage(
+  value: string,
+  remoteImageHosts: readonly string[],
+  request: ImageFetch = fetch,
+): Promise<Uint8Array> {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new AssetError(`远程图片 URL 无效：${value}`, { code: 'invalid-remote-image-url' })
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new AssetError(`远程图片协议不受支持：${url.protocol}`, { code: 'unsupported-remote-image-protocol' })
+  }
+
+  const allowed = new Set(remoteImageHosts.map((host) => host.trim().toLowerCase()).filter(Boolean))
+  if (!allowed.has(url.hostname.toLowerCase())) {
+    throw new AssetError(`远程图片主机不在 remoteImageHosts 白名单中：${url.hostname}`, {
+      code: 'remote-image-host-not-allowed',
+    })
+  }
+
+  let response: Response
+  try {
+    response = await request(url, {
+      headers: { accept: 'image/*' },
+      // A redirect would need its final host checked again. Reject it rather
+      // than letting a trusted CDN redirect this process to an arbitrary host.
+      redirect: 'error',
+    })
+  } catch (cause) {
+    throw new AssetError(`下载远程图片失败：${url.href}`, { code: 'remote-image-download-failed', cause })
+  }
+
+  if (!response.ok) {
+    throw new AssetError(`下载远程图片失败（HTTP ${response.status}）：${url.href}`, {
+      code: 'remote-image-download-failed',
+    })
+  }
+
+  const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() ?? ''
+  if (!contentType.startsWith('image/')) {
+    throw new AssetError(`远程响应不是图片（${contentType || '未提供 Content-Type'}）：${url.href}`, {
+      code: 'remote-image-not-image',
+    })
+  }
+
+  const declaredLength = Number(response.headers.get('content-length'))
+  if (Number.isFinite(declaredLength) && declaredLength > IMAGE_BOUNDS.maxSourceBytes) {
+    throw new AssetError(`远程图片超过 ${IMAGE_BOUNDS.maxSourceBytes} 字节上限：${url.href}`, {
+      code: 'source-image-too-large',
+    })
+  }
+
+  if (!response.body) {
+    throw new AssetError(`远程图片响应没有正文：${url.href}`, { code: 'remote-image-empty-response' })
+  }
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > IMAGE_BOUNDS.maxSourceBytes) {
+        throw new AssetError(`远程图片超过 ${IMAGE_BOUNDS.maxSourceBytes} 字节上限：${url.href}`, {
+          code: 'source-image-too-large',
+        })
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return bytes
 }
 
 export function isSvgDataUri(value: string): boolean {

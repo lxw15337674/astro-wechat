@@ -24,6 +24,8 @@ interface SyncOutcome {
 export interface SynchronizeDeps {
   readonly client: WeChatClient
   readonly store: StateStore
+  /** Exact hostnames that actual uploads may download images from. */
+  readonly remoteImageHosts?: readonly string[]
   /** Injected in tests so the suite does not require the native image pipeline. */
   readonly normalize?: (asset: AssetIdentity, warnings: WarningCollector) => Promise<NormalizedImage>
 }
@@ -144,7 +146,8 @@ async function create(
   reusableCoverHash: string | undefined,
 ): Promise<SyncOutcome> {
   const { document } = rendered
-  const normalize = deps.normalize ?? normalizeImage
+  const normalize = deps.normalize ?? ((asset, warnings) =>
+    normalizeImage(asset, warnings, { remoteImageHosts: deps.remoteImageHosts }))
   const warnings = new WarningCollector()
 
   // Written before any WeChat call. A pending entry found on a later run is the

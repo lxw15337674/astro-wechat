@@ -200,6 +200,7 @@ async function runPublish(
   const deps = {
     client: WeChatClient.fromEnvironment(),
     store: JsonLedgerStore.forProject(resolved),
+    remoteImageHosts: resolved.config.remoteImageHosts,
   }
 
   const results: ArticleResult[] = []
