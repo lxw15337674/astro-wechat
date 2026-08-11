@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { extname, relative, resolve } from 'node:path'
-import matter from 'gray-matter'
+import { parseDocument } from 'yaml'
 import { SourceValidationError } from '../errors.js'
 import type { SourceArticle } from '../types.js'
 import { normalizeRelativePath } from '../util/text.js'
@@ -32,14 +32,52 @@ export async function loadSourceArticle(
     })
   }
 
-  const raw = await readFile(path, 'utf8')
-  const parsed = matter(raw)
+  const { frontmatter, body } = parseFrontmatter(await readFile(path, 'utf8'), path)
 
   return {
     absolutePath: path,
     projectRelativePath: normalizeRelativePath(relative(projectRoot, path)),
-    frontmatter: parsed.data as Record<string, unknown>,
-    body: parsed.content,
+    frontmatter,
+    body,
     format: 'md',
   }
+}
+
+function parseFrontmatter(raw: string, sourcePath: string): {
+  readonly frontmatter: Record<string, unknown>
+  readonly body: string
+} {
+  const opening = /^(?:\uFEFF)?---[ \t]*\r?\n/.exec(raw)
+  if (!opening) return { frontmatter: {}, body: raw }
+
+  const closing = /^---[ \t]*\r?$/gm
+  closing.lastIndex = opening[0].length
+  const match = closing.exec(raw)
+  if (!match) {
+    throw new SourceValidationError('frontmatter 缺少结束分隔符 ---。', {
+      code: 'frontmatter-unclosed',
+      sourcePath,
+    })
+  }
+
+  const document = parseDocument(raw.slice(opening[0].length, match.index))
+  if (document.errors.length > 0) {
+    const detail = document.errors.map(error => error.message).join('; ')
+    throw new SourceValidationError(`无法解析 YAML frontmatter：${detail}`, {
+      code: 'frontmatter-invalid',
+      sourcePath,
+    })
+  }
+
+  const value = document.toJS()
+  if (value !== null && (typeof value !== 'object' || Array.isArray(value))) {
+    throw new SourceValidationError('frontmatter 必须是 YAML 对象。', {
+      code: 'frontmatter-not-object',
+      sourcePath,
+    })
+  }
+
+  const bodyStart = match.index + match[0].length
+  const body = raw.slice(bodyStart).replace(/^\r?\n/, '')
+  return { frontmatter: (value ?? {}) as Record<string, unknown>, body }
 }

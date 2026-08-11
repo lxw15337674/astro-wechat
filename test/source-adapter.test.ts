@@ -146,3 +146,24 @@ describe('MDX', () => {
     await expect(loadSourceArticle(path, resolved.root)).rejects.toThrow(/MDX/)
   })
 })
+
+describe('frontmatter parsing', () => {
+  it('retains nested WeChat fields and removes one delimiter newline', async () => {
+    const path = project.write(
+      'src/data/blog/nested.md',
+      '---\ntitle: nested\nwechat:\n  enabled: true\n---\n\n正文。\n',
+    )
+    const resolved = await project.resolved()
+    const source = await loadSourceArticle(path, resolved.root)
+
+    expect(source.frontmatter.wechat).toEqual({ enabled: true })
+    expect(source.body).toBe('\n正文。\n')
+  })
+
+  it('reports malformed YAML frontmatter', async () => {
+    const path = project.write('src/data/blog/invalid.md', '---\ntitle: [unterminated\n---\n正文。\n')
+    const resolved = await project.resolved()
+
+    await expect(loadSourceArticle(path, resolved.root)).rejects.toThrow(/无法解析 YAML frontmatter/)
+  })
+})
