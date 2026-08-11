@@ -62,18 +62,18 @@ export function toArticleDocument(
       { code: 'title-missing', sourcePath },
     )
   }
-  assertWithinLimit('title', title, sourcePath)
+  if (!options.allowMissingPublishFields) assertWithinLimit('title', title, sourcePath)
 
   const body = stripLeadingTitleHeading(source.body, firstHeading, title)
   const author = firstDefined(wechat.author, asString(frontmatter.author), project.config.defaultAuthor)
-  if (author) assertWithinLimit('author', author, sourcePath)
+  if (author && !options.allowMissingPublishFields) assertWithinLimit('author', author, sourcePath)
 
   const rawDigest = firstDefined(
     wechat.digest,
     asString(frontmatter.description),
     stripMarkdown(body).slice(0, 400),
   )
-  const digest = fitDigest(rawDigest ?? '', warnings, sourcePath)
+  const digest = options.allowMissingPublishFields ? rawDigest ?? '' : fitDigest(rawDigest ?? '', warnings, sourcePath)
 
   const canonicalUrl = resolveCanonicalUrl(source, project, wechat, frontmatter)
   if (!canonicalUrl) {

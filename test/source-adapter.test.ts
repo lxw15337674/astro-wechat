@@ -178,4 +178,14 @@ describe('frontmatter parsing', () => {
     expect(inspection.skipReason).toBe('not-enabled')
     expect(inspection.document.cover).toBe('')
   })
+
+  it('does not apply WeChat metadata limits to opted-out posts', async () => {
+    const path = writePost(project, {
+      frontmatter: { title: '过长标题'.repeat(20), wechat: { enabled: false } },
+    })
+    const resolved = await project.resolved()
+    const inspection = await inspectArticle(path, resolved)
+
+    expect(inspection.skipReason).toBe('not-enabled')
+  })
 })
