@@ -23,6 +23,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Verify native optional dependencies
+        run: |
+          node -e "Promise.all([import('sharp'), import('@resvg/resvg-js')]).then(([sharp, resvg]) => { if (!sharp.default.versions.sharp || typeof resvg.Resvg !== 'function') process.exit(1) })"
+
       - run: pnpm run typecheck
 
       - run: pnpm test
@@ -30,3 +34,24 @@ jobs:
       # 构建单独跑：declaration emit 会暴露 --noEmit 检查不出的问题，
       # 例如导出函数签名里引用了未导出的类型。
       - run: pnpm run build
+
+  proxy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: services/yt-dlp-fastapi/requirements.txt
+
+      - name: Install proxy dependencies
+        working-directory: services/yt-dlp-fastapi
+        run: python -m pip install -r requirements.txt
+
+      - name: Test proxy service
+        working-directory: services/yt-dlp-fastapi
+        run: python -m unittest discover -s tests

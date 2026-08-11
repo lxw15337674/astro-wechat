@@ -78,7 +78,35 @@ Authorization: Bearer <WECHAT_PROXY_TOKEN>
 
 用于已列入白名单的机器上本地调试，以及代理故障时的应急通道。CI 必须配置代理，托管 runner 直连必然失败。
 
-## 7. 变更流程
+## 7. 部署自检
+
+部署后从本地验证，**不要用生产账户**：
+
+```bash
+# 应当返回 401
+curl -i https://你的代理/wechat/cgi-bin/stable_token
+
+# 应当返回 403：群发接口不在白名单里
+curl -i -H "Authorization: Bearer $WECHAT_PROXY_TOKEN" \
+  https://你的代理/wechat/cgi-bin/message/mass/send
+
+# 应当返回微信的真实响应
+curl -i -H "Authorization: Bearer $WECHAT_PROXY_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"grant_type":"client_credential","appid":"x","secret":"y"}' \
+  https://你的代理/wechat/cgi-bin/stable_token
+```
+
+第三条**必须是 HTTP 200 且 body 里有 `errcode`**。这说明代理原样透传，没有替调用方「处理」错误 —— 一旦它把 errcode 翻译成 HTTP 状态码，Node 侧的错误分类就全错了。
+
+日志方面还要确认两处，它们不在本仓库和 submodule 的控制范围内：
+
+- 前置的 Nginx / Caddy 是否记录完整 URL
+- APM 或错误上报 SDK 是否采集 URL 与请求体
+
+`access_token` 在 query 里，AppSecret 在 token 请求的 body 里，任一处记全就等于凭据落盘。
+
+## 8. 变更流程
 
 代理不理解微信，因此增加微信接口调用通常**不需要改代理代码**，只需要在路径白名单里加一行配置。
 

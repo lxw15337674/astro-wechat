@@ -72,7 +72,7 @@ ADR-0005 把微信协议实现留在 Node，因此这一条覆盖全部微信调
 
 ### 已核实
 
-**Node 依赖版本与可安装性**（2026-08-10，pnpm）。全部安装成功，里程碑 1 的测试在这套版本下通过：
+**Node 依赖版本与可安装性**（2026-08-11，pnpm）。全部安装成功，里程碑 1-5 的 135 项测试与 `build` 在这套版本下通过：
 
 | 包 | 版本范围 |
 | --- | --- |
@@ -83,20 +83,45 @@ ADR-0005 把微信协议实现留在 Node，因此这一条覆盖全部微信调
 | `juice` | `^12.1.2` |
 | `sanitize-html` | `^2.17.6` |
 | `cac` | `^7.0.0` |
+| `@resvg/resvg-js`（可选） | `^2.6.2` |
+| `sharp`（可选） | `^0.35.3` |
 
-两处类型问题在集成时暴露并已解决，记录于此以免重犯：
+两个可选原生模块在开发机（Linux x64/WSL）上安装并实际加载成功：`sharp` 0.35.3 使用 libvips 8.18.3，`@resvg/resvg-js` 2.6.2 成功加载原生 `Resvg`。上游支持矩阵覆盖 CI 使用的 Node 22/Linux x64 glibc：resvg-js 提供对应 napi-rs 预编译包；sharp 为 Linux x64 glibc 提供预编译包，但要求 glibc >= 2.28 和 SSE4.2。`ubuntu-latest` 满足这些约束。
+
+集成时暴露并已解决的类型问题，记录于此以免重犯：
 
 - `markdown-it` v15 自带类型，其默认导出是值而非类声明，名字不能直接用作类型。使用 `InstanceType<typeof MarkdownIt>`。
 - `markdown-it-footnote` 不提供类型声明。本仓库在 `src/module-declarations.d.ts` 中自带最小声明，且刻意不引用 markdown-it 的类型 —— `skipLibCheck` 不检查该文件，在其中犯同样的错误不会有任何报错。
+- **fetch 相关类型来自 `@types/node` 而非 DOM lib，全局可见的名字比浏览器少。** `BodyInit` 不是全局名，改用 `RequestInit['body']`；假 fetch 的参数从 `Parameters<typeof fetch>` 推导。写全局名之前先确认它确实是全局的。
+- `Blob` 构造参数在 TS 7 + `@types/node` 26 下对 `Uint8Array` 的底层缓冲区类型有要求，需要复制为 `ArrayBuffer` 支撑的视图。
+- `sharp` 以结构化类型而非 `typeof import('sharp')` 描述。它是可选依赖，类型查询会让没装成功的机器连 `typecheck` 都过不了。
+
+**`doocs/md` 核实结果**（2026-08-11，仓库 HEAD `130f8d5`）：仓库采用 WTFPL，并已有内部 `@md/core` workspace；但公共 npm registry 中没有 `@md/core`，根包 `md` 是编辑器 monorepo 而非可编程渲染库。因此不把它加入运行时依赖，继续使用本仓库独立、可替换的默认主题。以后若单独引入其 CSS，仍须在主题文件头记录来源 commit 与许可证。
+
+**代理侧依赖**（2026-08-11，读 submodule 源码确认）。`yt_dlp_fastapi/requirements.txt`：
+
+```
+fastapi>=0.115,<1.0
+httpx>=0.27,<1.0
+playwright>=1.55,<2.0
+python-dotenv>=1.0,<2.0
+uvicorn[standard]>=0.30,<1.0
+yt-dlp>=2026.2.21,<2027.0.0
+```
+
+`httpx` 已经是既有依赖，转发端点不引入任何新包。`python-multipart` 也不需要 —— 转发端点读原始请求体透传，不解析 multipart。
+
+两项与安全相关的现状：
+
+- **该服务已有通用转发端点 `/v1/proxy`，但不能复用**。理由见 ADR-0005 第 2 条，其中「不支持 multipart 请求体」是硬阻塞。
+- **uvicorn access log 会泄露 access token**。access log 记录完整请求行含 query string，而微信把 `access_token` 放在 query 里。已通过在 `uvicorn.run()` 传 `access_log=False` 解决，代理端点自行输出不含 query 的日志行。前置反向代理与 APM 仍需单独确认。
 
 ### 待核实
 
-以下都不阻塞里程碑 1，但在首个公开预发布版本前必须完成。
+以下都不阻塞代码，但在首个公开预发布版本前必须完成。
 
-1. `doocs/md` 是否发布了可编程调用的 core 包（而非编辑器应用或本地服务），其许可证，以及其主题 CSS 能否单独引入。这决定第 2 条中主题文件的来源，不影响其他任何决策。
-2. `@resvg/resvg-js` 与 `sharp` 在 Node 22 与目标 CI 架构上是否提供预编译二进制。两者都声明为可选依赖并在使用时才动态导入，因此安装失败不影响渲染、预览与测试；但缺了 `sharp` 就无法发布（图片规范化是上传的前置步骤），缺了 `@resvg/resvg-js` 则 SVG 封面不可用。
-3. `yt_dlp_fastapi` 现有的 Python 版本与依赖集合，确认加入 `httpx` 不与既有依赖冲突；以及它当前是否记录 access log，若记录必须为转发路径关闭 query 与请求体的记录。
-4. 是否存在本文档写作时未知的、以库形态发布的微信排版方案。
+1. 首次公开预发布前再做一次生态检索，确认没有新出现的、以库形态发布且同时满足出站链接改写与上传前图片占位符要求的微信排版方案。
+2. 首次在 GitHub Actions 上运行后，确认锁文件在 Node 22/`ubuntu-latest` 实际选择了上述 Linux x64 预编译包；上游支持矩阵已经覆盖该组合，但 CI 运行记录才是最终证据。
 
 核实完成后把结论移到「已核实」一节并注明日期。
 

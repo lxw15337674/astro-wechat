@@ -6,28 +6,26 @@ Node.js 22 或更高。包是 ESM，源码为 TypeScript。
 
 ## 安装依赖
 
-`package.json` 中**尚未写入依赖版本**。这是刻意的：写作时无法联网核实各包的当前版本，凭记忆写死版本范围只会安装失败或锁到过时版本。
+依赖版本已经由 pnpm 写入 `package.json` 和 `pnpm-lock.yaml`。
 
 首次安装执行：
 
 ```bash
-pnpm add markdown-it markdown-it-footnote gray-matter cheerio juice sanitize-html cac
-pnpm add -O @resvg/resvg-js sharp
-pnpm add -D typescript vitest @types/node @types/markdown-it @types/sanitize-html
+pnpm install
 ```
 
-由包管理器写入实际版本，然后核对 ADR-0003「待核实」一节的各项，并把结论写回该文档。
+`@resvg/resvg-js` 与 `sharp` 是可选依赖：都是原生模块，缺少预编译二进制的平台上装不上。它们只在实际处理图片时才被动态导入，缺失时给出明确报错，渲染与预览之外的功能不受影响。**测试套件不需要它们**，所以装不上也能完整跑测试。
 
-`@resvg/resvg-js` 与 `sharp` 是可选依赖：都是原生模块，缺少预编译二进制的平台上装不上。它们只在实际处理图片时才被动态导入，缺失时给出明确报错，渲染与预览之外的功能不受影响。测试套件不需要它们。
+正因如此，代码里不能对这两个包做类型查询（`typeof import('sharp')`），否则没装成功的机器连 `typecheck` 都过不了。它们用结构化类型描述，见 `src/image/normalize.ts`。
 
 ## 常用命令
 
 | 命令 | 说明 |
 | --- | --- |
-| `npm test` | 运行测试 |
-| `npm run test:watch` | 监听模式 |
-| `npm run typecheck` | 只做类型检查，不产出 |
-| `npm run build` | 编译到 `dist/` |
+| `pnpm test` | 运行测试 |
+| `pnpm run test:watch` | 监听模式 |
+| `pnpm run typecheck` | 只做类型检查，不产出 |
+| `pnpm run build` | 编译到 `dist/` |
 
 ## 目录结构
 
@@ -55,8 +53,8 @@ src/
 test/
   helpers/            临时 Astro 项目与假 fetch
 services/
-  wechat-proxy-reference/  转发代理参考实现，待复制进 submodule
-  yt-dlp-fastapi/          转发代理（git submodule，不属于 npm 包）
+  yt-dlp-fastapi/     转发代理（git submodule，不属于 npm 包）
+                      app/wechat_proxy.py 是 /wechat/* 转发端点
 examples/
   github-workflow.yml      CI job 示例
 ```
@@ -95,6 +93,6 @@ examples/
 
 ## 里程碑
 
-里程碑 1（读取与预览）、2（创建草稿）、3（重复预防）的代码已完成，4（Astro 与 CI 集成）除工作流示例外已完成。里程碑划分见技术设计第 13 节。
+里程碑 1-5 的代码已完成并通过类型检查、135 项测试与构建。里程碑划分见技术设计第 13 节。
 
-尚未做的：转发代理接入实际服务（参考实现在 `services/wechat-proxy-reference/`）、真实账户端到端验证、里程碑 5 的发布流程。
+尚未做的见 [待办](todo.md)，主要是三类：代理实际部署与日志审计、需要真实账户实测的未核实常量，以及 npm 发布。

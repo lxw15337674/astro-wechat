@@ -14,13 +14,13 @@
 | 微信客户端：token、图片、封面、草稿、查找 | 已实现 |
 | 草稿身份台账、两阶段写入、结果不明协调 | 已实现 |
 | CLI：inspect / preview / list / publish / publish-changed / cleanup-orphans | 已实现 |
-| 转发代理 | 参考实现见 `services/wechat-proxy-reference/`，未接入 |
+| 转发代理 | 已接入 `services/yt-dlp-fastapi` submodule，待部署验证 |
 | 真实账户端到端验证 | 未做 |
 | npm 发布 | 未做 |
 
 ## 计划中的包
 
-- npm 包：`@bhwa233/astro-wechat`（暂定，尚未确认可用性）
+- npm 包：`@bhwa233/astro-wechat`（公共 registry 当前未发布，仍需确认 npm scope 权限）
 - CLI 命令：`astro-wechat`
 - 运行时：Node.js 22+、ESM、TypeScript
 - 初始 Astro 目标版本：当前稳定大版本，并在发布前评估其前一个大版本
