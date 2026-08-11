@@ -14,7 +14,7 @@ pnpm run typecheck && pnpm test && pnpm run build
 
 公开父仓库已创建并推送。GitHub Actions 的 Node 22/`ubuntu-latest` job 已实际加载 `sharp` 与 `@resvg/resvg-js`；本地当前通过类型检查、141 项测试和构建。
 
-npm 包名已确定为 `@lxw15337674/astro-wechat`。本机 `npm whoami` 返回 `lxw15337674`，`npm access list packages lxw15337674` 显示该个人 scope 下已有包具备 `read-write` 权限；新包当前尚未发布。
+npm 包 `@lxw15337674/astro-wechat` 已发布 `0.1.0` 并标记为 `latest`。本机 `npm whoami` 返回 `lxw15337674`，`npm access list packages lxw15337674` 显示该个人 scope 下已有包具备 `read-write` 权限。
 
 ### 后续回归时优先看这几处
 
