@@ -56,6 +56,15 @@ describe('渲染流水线', () => {
     expect(rendered.html).toContain('第二条')
   })
 
+  it('列表左侧留出容得下多位序号的空间', async () => {
+    // 序号画在 padding 区域里，1em 只够一位数：超过九项后十位数会溢出到
+    // 容器外被裁掉，读者看到的是「9.」「0.」而不是「29.」「30.」。
+    for (const theme of ['default', 'doocs-default']) {
+      const rendered = await render('1. 第一条\n2. 第二条\n', {}, { theme })
+      expect(rendered.html, theme).toMatch(/<ol[^>]*style="[^"]*padding-left:2em/)
+    }
+  })
+
   it('松散列表里的段落同样不留标签间空白', async () => {
     const rendered = await render('1. 第一条\n\n2. 第二条\n')
 

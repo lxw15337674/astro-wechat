@@ -89,10 +89,14 @@ export const DOOCS_DEFAULT_THEME_CSS = `
   color: #0a0a0a;
 }
 
+/* Markers sit outside the content box, in this padding. One em fits a single
+   digit; "29." and beyond overflow past the left edge and the article
+   container clips them, so a list longer than nine items loses the tens
+   place. Two em holds three digits. */
 .astro-wechat-article ul,
 .astro-wechat-article ol {
   margin: 1em 0;
-  padding-left: 1em;
+  padding-left: 2em;
   color: #0a0a0a;
 }
 

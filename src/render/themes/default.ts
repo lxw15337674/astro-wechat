@@ -52,10 +52,13 @@ export const DEFAULT_THEME_CSS = `
   color: #8a9199;
 }
 
+/* Wide enough for a three-digit marker: markers render outside the content
+   box, and anything narrower gets clipped by the article container once the
+   list passes nine items. */
 .astro-wechat-article ul,
 .astro-wechat-article ol {
   margin: 1.2em 0;
-  padding-left: 1.4em;
+  padding-left: 2em;
 }
 
 .astro-wechat-article li {
