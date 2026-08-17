@@ -149,7 +149,7 @@ export const DEFAULT_THEME_CSS = `
 }
 
 .astro-wechat-article .footnotes-list {
-  padding-left: 1.4em;
+  padding-left: 2em;
   margin: 0;
 }
 

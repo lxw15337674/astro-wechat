@@ -1,6 +1,6 @@
 {
   "name": "@lxw15337674/astro-wechat",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Synchronize Astro Markdown articles to the WeChat Official Account draft box.",
   "type": "module",
   "packageManager": "pnpm@11.1.0",
@@ -43,6 +43,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

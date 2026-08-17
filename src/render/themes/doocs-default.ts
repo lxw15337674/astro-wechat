@@ -212,6 +212,6 @@ export const DOOCS_DEFAULT_THEME_CSS = `
 
 .astro-wechat-article .footnotes-list {
   margin: 0;
-  padding-left: 1em;
+  padding-left: 2em;
 }
 `
