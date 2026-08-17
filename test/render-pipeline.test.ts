@@ -43,6 +43,26 @@ describe('渲染流水线', () => {
     expect(rendered.html).not.toContain('var(--')
   })
 
+  it('去掉列表标签之间的空白，否则微信编辑器会插入空列表项', async () => {
+    // 微信把 ul/ol 内的纯空白文本节点提升成空 <li>：无序列表多出空行，
+    // 有序列表的编号直接翻倍（10 条故事会数到 20）。
+    const rendered = await render('1. 第一条\n2. 第二条\n\n- 甲\n- 乙\n')
+
+    expect(rendered.html).not.toMatch(/<\/li>\s+<li/)
+    expect(rendered.html).not.toMatch(/<(?:ul|ol)[^>]*>\s+<li/)
+    expect(rendered.html).not.toMatch(/<\/li>\s+<\/(?:ul|ol)>/)
+    // 列表项自身的文本不受影响。
+    expect(rendered.html).toContain('第一条')
+    expect(rendered.html).toContain('第二条')
+  })
+
+  it('松散列表里的段落同样不留标签间空白', async () => {
+    const rendered = await render('1. 第一条\n\n2. 第二条\n')
+
+    expect(rendered.html).not.toMatch(/<\/li>\s+<li/)
+    expect(rendered.html).not.toMatch(/<li[^>]*>\s+<p/)
+  })
+
   it('净化掉脚本与事件处理属性', async () => {
     const rendered = await render('<script>alert(1)</script>\n\n<p onclick="x()">文本</p>\n')
     expect(rendered.html).not.toContain('<script')

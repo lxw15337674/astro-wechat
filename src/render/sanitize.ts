@@ -40,6 +40,21 @@ const OPTIONS: sanitizeHtml.IOptions = {
   disallowedTagsMode: 'discard',
 }
 
+/**
+ * Whitespace between list tags, which HTML ignores and the WeChat editor does not.
+ *
+ * The editor promotes a whitespace-only text node inside a list into an empty
+ * `<li>`, so every real item gains an empty sibling: bullet lists grow blank
+ * rows and ordered lists count to twice their length. Markdown renderers put a
+ * newline between items, so this reaches every list we publish.
+ */
+const AFTER_LIST_TAG = /(<\/?(?:ul|ol|li)\b[^>]*>)\s+/g
+const BEFORE_LIST_CLOSE = /\s+(<\/(?:ul|ol|li)>)/g
+
+export function collapseListWhitespace(html: string): string {
+  return html.replace(AFTER_LIST_TAG, '$1').replace(BEFORE_LIST_CLOSE, '$1')
+}
+
 export function sanitizeArticleHtml(html: string): string {
-  return sanitizeHtml(html, OPTIONS)
+  return collapseListWhitespace(sanitizeHtml(html, OPTIONS))
 }
