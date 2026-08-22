@@ -65,6 +65,15 @@ describe('渲染流水线', () => {
     }
   })
 
+  it('标题里的加粗沿用标题自身的颜色', async () => {
+    // Substack 之类的来源惯常输出 <h2><strong>…</strong></h2>。strong 的品牌色
+    // 若压过标题的反白色，doocs-default 的二级标题就是深蓝字压深蓝底。
+    for (const theme of ['default', 'doocs-default']) {
+      const rendered = await render('## **二级标题**\n', {}, { theme })
+      expect(rendered.html, theme).toMatch(/<strong[^>]*style="[^"]*color:inherit/)
+    }
+  })
+
   it('松散列表里的段落同样不留标签间空白', async () => {
     const rendered = await render('1. 第一条\n\n2. 第二条\n')
 

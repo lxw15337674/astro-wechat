@@ -165,6 +165,20 @@ export const DOOCS_DEFAULT_THEME_CSS = `
   font-weight: bold;
 }
 
+/* Markdown lets a heading carry bold text, and Substack-style sources emit
+   <h2><strong>…</strong></h2> routinely. Without this the brand color above
+   wins on the inner element and an h2 renders dark blue on its own dark blue
+   background. Headings are already bold, so the emphasis only owes them their
+   own color. */
+.astro-wechat-article h1 strong,
+.astro-wechat-article h2 strong,
+.astro-wechat-article h3 strong,
+.astro-wechat-article h4 strong,
+.astro-wechat-article h5 strong,
+.astro-wechat-article h6 strong {
+  color: inherit;
+}
+
 .astro-wechat-article em {
   font-size: inherit;
   font-style: italic;

@@ -1,6 +1,6 @@
 {
   "name": "@lxw15337674/astro-wechat",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Synchronize Astro Markdown articles to the WeChat Official Account draft box.",
   "type": "module",
   "packageManager": "pnpm@11.1.0",

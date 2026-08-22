@@ -44,6 +44,17 @@ export const DEFAULT_THEME_CSS = `
   color: #1a1d1f;
 }
 
+/* A bold heading must keep the heading's own color: the rule above targets a
+   descendant, so it would otherwise override whatever the heading set. */
+.astro-wechat-article h1 strong,
+.astro-wechat-article h2 strong,
+.astro-wechat-article h3 strong,
+.astro-wechat-article h4 strong,
+.astro-wechat-article h5 strong,
+.astro-wechat-article h6 strong {
+  color: inherit;
+}
+
 .astro-wechat-article em {
   font-style: italic;
 }
